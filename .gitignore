@@ -315,3 +315,6 @@ $RECYCLE.BIN/
 # End of https://www.toptal.com/developers/gitignore/api/intellij,python,windows
 
 temp/
+
+db/bot.db
+db/bot_orm.db
