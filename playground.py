@@ -57,15 +57,15 @@ guessed_letters = "hgtofijk"
 
 # hg.save()
 
-query = hangman.HangmanGame.select().where(hangman.HangmanGame.guild_id == 0).order_by(hangman.HangmanGame.created_at.desc())
-print(query)
-for hg in query:
-    print(hg.phrase, hg.num_guesses)
+# query = hangman.HangmanGame.select().where(hangman.HangmanGame.guild_id == 0).order_by(hangman.HangmanGame.created_at.desc())
+# print(query)
+# for hg in query:
+#     print(hg.phrase, hg.num_guesses)
 
-now = datetime.now()
-reminders = Reminder.select().where(Reminder.remind_at <= now)
-for reminder in reminders:
-    print(reminder.message, reminder.remind_at)
+# now = datetime.now()
+# reminders = Reminder.select().where(Reminder.remind_at <= now)
+# for reminder in reminders:
+#     print(reminder.message, reminder.remind_at)
 # print(1740988677 - hangman.EIGHT_HOURS)
 # print(datetime.fromtimestamp(1740988677))
 # now = int(datetime.now().timestamp())
@@ -96,3 +96,7 @@ for reminder in reminders:
 # print(new_time.timestamp())
 # print(int(new_time.timestamp()))
 # print(hg.created_at + hangman.EIGHT_HOURS)
+
+tzs = time_funcs.list_timezones(1322792221665132567)
+print(tzs)
+print(time_funcs.format_tzs_response_str(tzs))

@@ -266,13 +266,13 @@ async def clock_list_slash_command(interaction: discord.Interaction):
 
 
 async def clock_full_list_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
-    existing = [x[1] for x in time_funcs.list_timezones(interaction.guild_id)]
+    existing = [x.timezone_str for x in time_funcs.list_timezones(interaction.guild_id)]
     options = [tz for tz in pytz.all_timezones if tz not in existing]
     return [discord.app_commands.Choice(name=option, value=option) for option in options if option.lower().startswith(current.lower())][:25]
 
 
 async def clock_existing_list_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
-    options = [x[1] for x in time_funcs.list_timezones(interaction.guild_id)]
+    options = [x.timezone_str for x in time_funcs.list_timezones(interaction.guild_id)]
     return [discord.app_commands.Choice(name=option, value=option) for option in options if option.lower().startswith(current.lower())][:25]
 
 
@@ -307,7 +307,7 @@ async def clock_edit_slash_command(interaction: discord.Interaction, timezone: s
         return
 
     # Send the modal
-    await interaction.response.send_modal(time_funcs.EditTimezoneLabelModal(interaction.guild_id, timezone, existing_tz[2] if existing_tz[2] else ""))
+    await interaction.response.send_modal(time_funcs.EditTimezoneLabelModal(interaction.guild_id, timezone, existing_tz.label if existing_tz.label else ""))
 
 
 # Subcommand `/hangman startgame`

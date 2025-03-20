@@ -12,11 +12,11 @@ import time_funcs
 import todo
 from hangman import HangmanGame, orm_db
 from reminder import Reminder
+from time_funcs import WorldClock
 
 
 def create_dbs():
     todo.create_db()
-    time_funcs.create_db()
 
     orm_db_file_path = "bot_orm.db"
 
@@ -28,4 +28,4 @@ def create_dbs():
         print("DB already exists")
 
     orm_db.connect()
-    orm_db.create_tables([HangmanGame, Reminder])
+    orm_db.create_tables([HangmanGame, Reminder, WorldClock])
