@@ -17,6 +17,7 @@ import color
 import db.db
 import dice
 import eight_ball
+import encode
 import hangman
 import rps
 import time_funcs
@@ -69,7 +70,7 @@ async def on_message(message: discord.Message):
     if message.author == client.user:
         return  # Ignore the bot's own messages
 
-    message_content = message.content.lower()
+    message_content = message.content
 
     if not message_content.startswith(command_prefix):
         return  # Ignore message that don't start with the command prefix "!"
@@ -77,7 +78,7 @@ async def on_message(message: discord.Message):
     print(f"! command \t\t| Server: {message.guild.name}, Channel: {message.channel.name}, Author: {message.author}, Content: {message.content}")
 
     command_body = message_content[len(command_prefix):].split(" ")
-    command = command_body[0]
+    command = command_body[0].lower()
     args = command_body[1:]
 
     try:
@@ -87,10 +88,6 @@ async def on_message(message: discord.Message):
             case "hello" | "hi" | "hey":
                 await message.add_reaction("👋")
                 result = "Hello!"
-
-                user = client.get_user(message.author.id)
-                if user:
-                    await user.send(f"⏰ Reminder: test")
             case "f":
                 result = await eight_ball.f_in_chat(message)
             case "gg":
@@ -111,6 +108,10 @@ async def on_message(message: discord.Message):
                 result, files = color.handle_color_command(args)
             case "clock" | "clocks":
                 result = time_funcs.handle_world_clock_command(args, message.guild.id)
+            case "encode":
+                result = encode.handle_encode_decode_command(args, "encode")
+            case "decode":
+                result = encode.handle_encode_decode_command(args, "decode")
             case _:
                 result = "Command not recognized."
         if files:
@@ -119,6 +120,8 @@ async def on_message(message: discord.Message):
             await message.channel.send(result)
 
     except InvalidInputError as e:
+        await message.channel.send(f"Error: {e}")
+    except ValueError as e:
         await message.channel.send(f"Error: {e}")
 
 
@@ -166,7 +169,7 @@ async def roll_slash_command(interaction: discord.Interaction, dice_roll: str):
     await interaction.response.send_message(dice_roll + "\n" + result)
 
 
-@tree.command(name="rps", description=r"Play Rock, Paper, Scissors")
+@tree.command(name="rps", description="Play Rock, Paper, Scissors")
 @log_interaction
 async def rps_slash_command(interaction: discord.Interaction, player_choice: rps.RPSChoice):
     bot_choice = random.choice(list(rps.RPSChoice))
@@ -174,7 +177,24 @@ async def rps_slash_command(interaction: discord.Interaction, player_choice: rps
     await interaction.response.send_message(result)
 
 
-@tree.command(name="color", description=r"generate an image of a given color or random color is supplied with 'random'")
+@tree.command(name="encode", description="Encode a message")
+@log_interaction
+async def encode_slash_command(interaction: discord.Interaction, message: str, encoder: encode.EncoderChoice):
+    # result = encode.encode_decode(message, encoder.value)
+    args = [encoder.value] +  message.split(" ")
+    result = encode.handle_encode_decode_command(args, "encode")
+    await interaction.response.send_message(result)
+
+@tree.command(name="decode", description="Decode a message")
+@log_interaction
+async def decode_slash_command(interaction: discord.Interaction, message: str, encoder: encode.EncoderChoiceWithoutAll):
+    # result = encode.encode_decode(message, encoder.value, operation='decode')
+    args = [encoder.value] +  message.split(" ")
+    result = encode.handle_encode_decode_command(args, "decode")
+    await interaction.response.send_message(result)
+
+
+@tree.command(name="color", description="generate an image of a given color or random color is supplied with 'random'")
 @log_interaction
 async def color_slash_command(interaction: discord.Interaction, color_str: str = None, num_colors: discord.app_commands.Range[int, 1, 10] = 1):
     if not color_str:
@@ -186,13 +206,6 @@ async def color_slash_command(interaction: discord.Interaction, color_str: str =
 
     result, files = color.handle_color_command(color_str)
     await interaction.response.send_message(result, files=[discord.File(file) for file in files])
-
-
-@tree.command(name="times", description=r"Display the current times for the members of this server")
-@log_interaction
-async def times_slash_command(interaction: discord.Interaction):
-    result = time_funcs.get_current_time()
-    await interaction.response.send_message(result)
 
 
 # Subcommand `/todo add`

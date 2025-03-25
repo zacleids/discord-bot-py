@@ -1,3 +1,4 @@
+import base64
 import json
 import random
 import re
@@ -6,6 +7,7 @@ from zoneinfo import ZoneInfo
 from pytz import timezone, all_timezones
 
 import db.db
+from encode import decode_base64
 import hangman
 from reminder import Reminder
 import time_funcs
@@ -97,6 +99,12 @@ guessed_letters = "hgtofijk"
 # print(int(new_time.timestamp()))
 # print(hg.created_at + hangman.EIGHT_HOURS)
 
-tzs = time_funcs.list_timezones(1322792221665132567)
-print(tzs)
-print(time_funcs.format_tzs_response_str(tzs))
+# tzs = time_funcs.list_timezones(1322792221665132567)
+# print(tzs)
+# print(time_funcs.format_tzs_response_str(tzs))
+
+encoded_info = base64.b64encode("hello there kind stranger".encode()).decode()
+# print(encoded_info)
+a = "aGVsbG8gdGhlcmUga2luZCBzdHJhbmdlcg=="
+# print(base64.b64decode(encoded_info.encode()).decode())
+print(decode_base64(a))

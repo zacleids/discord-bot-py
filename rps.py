@@ -29,7 +29,7 @@ def play_rock_paper_scissors(args: list[str]) -> str:
     if len(args) == 0:
         raise InvalidInputError(r"Invalid input. please use choose rock, paper, or scissors")
 
-    player_choice_str = " ".join(args)
+    player_choice_str = " ".join(args).lower()
 
     # Convert string to Enum member
     try:

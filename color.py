@@ -55,7 +55,7 @@ def handle_color_command(args: list[str]):
         generate_image(rand_color)
         result = formate_rgb_tuple(rand_color)
     else:
-        subcommand = args[0]
+        subcommand = args[0].lower()
         sub_args = args[1:]
 
         if len(sub_args) > 1:

@@ -159,7 +159,7 @@ def handle_todo_command(args: list[str], user: discord.User, mentions: list[disc
     if not args:
         result = "Please provide a subcommand (add, remove, list)."
     else:
-        subcommand = args[0]
+        subcommand = args[0].lower()
         sub_args = args[1:]
 
         if len(mentions) > 1:
