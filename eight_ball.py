@@ -70,7 +70,7 @@ def tell_me_why():
 
 
 async def eight_ball(args: list[str], message: Optional[discord.Message] = None) -> str:
-    question = " ".join(args)
+    question = " ".join(args).lower()
     match question:
         case "tell me why?" | "tell me why":
             return tell_me_why()

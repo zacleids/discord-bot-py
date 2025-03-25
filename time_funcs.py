@@ -75,7 +75,7 @@ def handle_world_clock_command(args: list[str], guild_id: int):
     if not args:
         result = "Please provide a subcommand (add, remove, list)."
     else:
-        subcommand = args[0]
+        subcommand = args[0].lower()
         sub_args = args[1:]
 
         match subcommand:
