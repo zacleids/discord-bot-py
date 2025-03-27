@@ -22,6 +22,7 @@ import hangman
 import rps
 import time_funcs
 import todo
+import text_transform
 from errors import InvalidInputError
 from log_interaction import log_interaction
 from reminder import Reminder, EditReminderModal
@@ -112,6 +113,8 @@ async def on_message(message: discord.Message):
                 result = encode.handle_encode_decode_command(args, "encode")
             case "decode":
                 result = encode.handle_encode_decode_command(args, "decode")
+            case "transform":
+                result = text_transform.handle_text_transform_command(args)
             case _:
                 result = "Command not recognized."
         if files:
@@ -206,6 +209,13 @@ async def color_slash_command(interaction: discord.Interaction, color_str: str =
 
     result, files = color.handle_color_command(color_str)
     await interaction.response.send_message(result, files=[discord.File(file) for file in files])
+
+
+@tree.command(name="transform", description="Transform text in various ways")
+@log_interaction
+async def transform_slash_command(interaction: discord.Interaction, text: str, transform_type: text_transform.TransformChoice):
+    result = text_transform.transform_text(text, transform_type)
+    await interaction.response.send_message(result)
 
 
 # Subcommand `/todo add`
