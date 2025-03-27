@@ -46,11 +46,11 @@ MIRROR_MAP = {
     'W': 'W', 'X': 'X', 'Y': 'Y', 'Z': 'Ƹ', 'Ƹ': 'Z'
 }
 
-def reverse_text(text: str) -> str:  # renamed from mirror_text
+def reverse_text(text: str) -> str:
     """Returns the text reversed"""
     return text[::-1]
 
-def mirror_text(text: str) -> str:  # new function
+def mirror_text(text: str) -> str:
     """Returns the text with mirrored characters"""
     return ''.join(MIRROR_MAP.get(c, c) for c in text)
 
