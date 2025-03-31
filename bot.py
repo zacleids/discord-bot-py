@@ -197,16 +197,17 @@ async def decode_slash_command(interaction: discord.Interaction, message: str, e
     await interaction.response.send_message(result)
 
 
-@tree.command(name="color", description="generate an image of a given color or random color is supplied with 'random'")
+@tree.command(name="color", description="generate an image of a given color or random color if supplied with 'random'")
 @log_interaction
-async def color_slash_command(interaction: discord.Interaction, color_str: str = None, num_colors: discord.app_commands.Range[int, 1, 10] = 1):
+async def color_slash_command(interaction: discord.Interaction, color_str: str = None, num_colors: discord.app_commands.Range[int, 1, 10] = 1, include_inverted: bool = False):
     if not color_str:
         color_str = ["random", str(num_colors)]
-    elif color_str == "random" or color_str == "rand" or color_str == "r":
+    elif color_str.lower() in ["random", "rand", "r"]:
         color_str = ["random", str(num_colors)]
     else:
         color_str = color_str.split(" ")
-
+    if include_inverted:
+        color_str.append("include_inverted:true")
     result, files = color.handle_color_command(color_str)
     await interaction.response.send_message(result, files=[discord.File(file) for file in files])
 

@@ -48,46 +48,79 @@ def generate_random_color() -> tuple[int, int, int]:
 
 
 def handle_color_command(args: list[str]):
+    # Process include_inverted flag with legacy syntax support
+    include_inverted = False
+    new_args = []
+
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg.lower().startswith("include_inverted:"):
+            if arg.split(":", 1)[1].strip().lower() == "true":
+                include_inverted = True
+            i += 1
+        elif arg.lower() == "include_inverted":
+            if i + 1 < len(args) and args[i+1].lower() == "true":
+                include_inverted = True
+                i += 2
+            else:
+                new_args.append(arg)
+                i += 1
+        else:
+            new_args.append(arg)
+            i += 1
+    args = new_args
+
+    if not args:
+        args = ["random", "1"]
+
+    single_color_rgb = None
     result = None
     files = []
-    if not args:
-        rand_color = generate_random_color()
-        generate_image(rand_color)
-        result = formate_rgb_tuple(rand_color)
-    else:
-        subcommand = args[0].lower()
-        sub_args = args[1:]
-
-        if len(sub_args) > 1:
-            raise InvalidInputError("Invalid args")
-
-        match subcommand:
-            case "random" | "rand" | "r":
-                num_colors = 1
-
-                if sub_args and sub_args[0] and not sub_args[0].isdigit():
-                    raise InvalidInputError("Must provide a digit for number of colors up to 10")
-                elif sub_args and sub_args[0]:
-                    num_colors = int(sub_args[0])
-
-                if num_colors > 10:
-                    raise InvalidInputError("Can only generate up to 10 colors at once")
-                result = ""
-                for i in range(0, num_colors):
-                    rand_color = generate_random_color()
-                    files.append(generate_image(rand_color, i))
-                    result = result + formate_rgb_tuple(rand_color) + "\n"
-            case _:
-                if is_valid_hex_code(subcommand):
-                    if len(subcommand) == 6:
-                        subcommand = "#" + subcommand
+    subcommand = args[0].lower()
+    sub_args = args[1:]
+    if len(sub_args) > 1:
+        raise InvalidInputError("Invalid args")
+    match subcommand:
+        case "random" | "rand" | "r":
+            num_colors = 1
+            if sub_args and sub_args[0] and not sub_args[0].isdigit():
+                raise InvalidInputError("Must provide a digit for number of colors up to 10")
+            elif sub_args and sub_args[0]:
+                num_colors = int(sub_args[0])
+            if num_colors > 10:
+                raise InvalidInputError("Can only generate up to 10 colors at once")
+            result = ""
+            for i in range(0, num_colors):
+                rand_color = generate_random_color()
+                if i == 0:
+                    single_color_rgb = rand_color
+                files.append(generate_image(rand_color, i))
+                result = result + formate_rgb_tuple(rand_color) + "\n"
+        case _:
+            if is_valid_hex_code(subcommand):
+                if len(subcommand) == 6:
+                    subcommand = "#" + subcommand
+                files.append(generate_image(subcommand))
+                single_color_rgb = ImageColor.getrgb(subcommand)
+                result = subcommand.upper()
+            else:
+                try:
                     files.append(generate_image(subcommand))
-                    result = subcommand.upper()
-                else:
-                    try:
-                        files.append(generate_image(subcommand))
-                        hex_code = ImageColor.getrgb(subcommand)
-                        result = subcommand + " " + formate_rgb_tuple(hex_code)
-                    except ValueError:
-                        raise InvalidInputError(f"Invalid color: {subcommand}")
+                    color_tuple = ImageColor.getrgb(subcommand)
+                    single_color_rgb = color_tuple
+                    result = subcommand + " " + formate_rgb_tuple(color_tuple)
+                except ValueError:
+                    raise InvalidInputError(f"Invalid color: {subcommand}")
+    
+    # Add inverted image/hex if flag is set
+    if include_inverted:
+        if len(files) > 1:
+            result += "\nWarning: Inverted color does not work with multiple colors at once"
+        elif single_color_rgb is not None and len(files) == 1:
+            inverse_color = tuple(255 - c for c in single_color_rgb)
+            inverse_hex = formate_rgb_tuple(inverse_color)
+            result += "\nInverse Hex: " + inverse_hex
+            files.append(generate_image(inverse_color, "inverted"))
+    
     return result, files
