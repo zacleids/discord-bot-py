@@ -30,6 +30,7 @@ from reminder import Reminder, EditReminderModal
 # Load .env variables
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
+BOT_ADMIN_ID = int(os.getenv('BOT_ADMIN_ID'))
 
 # Create bot instance
 intents = discord.Intents.default()
@@ -51,7 +52,7 @@ tree.add_command(hangman_command_group)
 reminder_command_group = discord.app_commands.Group(name="reminder", description="Set a reminder")
 tree.add_command(reminder_command_group)
 
-command_prefix = "!"
+command_prefix = os.getenv('COMMAND_PREFIX', "!")
 
 # Ensure the database and tasks table are set up
 db.db.create_dbs()
@@ -59,11 +60,8 @@ db.db.create_dbs()
 
 @client.event
 async def on_ready():
-    await tree.sync()
     print(f'We have logged in as {client.user}')
     check_reminders.start()
-    # if not check_reminders.is_running():
-    #     asyncio.create_task(check_reminders())  # Start the loop properly
 
 
 @client.event
@@ -86,6 +84,28 @@ async def on_message(message: discord.Message):
         result = "Uh Oh, something went wrong"
         files = None
         match command:
+            case "sync":
+                if message.author.id == BOT_ADMIN_ID:
+                    await message.channel.send("Syncing commands...")
+                    info = await tree.sync()
+                    result = "Commands synced!"
+
+                    #Send the sync info directly to the admin user
+                    cmd_names = set()
+                    for cmd in info:
+                        added = False
+                        for option in cmd.options:
+                            if option.type.name == discord.AppCommandOptionType.subcommand.name:
+                                cmd_names.add(f"{cmd.name} {option.name}")
+                                added = True
+                        if not added:
+                            cmd_names.add(cmd.name)
+
+                    cmd_names = sorted(cmd_names)
+                    info_message = f"Sync completed. {len(info)} top level commands registered & {len(cmd_names)} total commands registered:\n" + "\n".join(cmd_names)
+                    await message.author.send(info_message)
+                else:
+                    result = "You don't have permission to sync commands."
             case "hello" | "hi" | "hey":
                 await message.add_reaction("👋")
                 result = "Hello!"
