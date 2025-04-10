@@ -81,7 +81,7 @@ def handle_world_clock_command(args: list[str], guild_id: int):
         match subcommand:
             case "add":
                 if not sub_args:
-                    result = "Please provide a task to add."
+                    result = "Please provide a timezone to add."
                 else:
                     tz = get_valid_timezone(" ".join(sub_args))
                     result = add_timezone(guild_id, tz)
