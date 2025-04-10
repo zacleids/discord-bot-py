@@ -9,7 +9,7 @@ class DailyChecklist(Model):
     user_id = IntegerField()
     item = CharField()
     last_checked = DateField(null=True)   # stores last day this item was checked
-    sort_order = IntegerField(constraints=[SQL('DEFAULT 0')])  # New field for ordering
+    sort_order = IntegerField(constraints=[SQL('DEFAULT 0')])
     class Meta:
         database = orm_db
 
@@ -66,9 +66,18 @@ def check_item(user_id: int, position: int) -> Tuple[bool, str]:
     item.save()
     return True, f"Item '{item.item}' marked as completed for today."
 
+def uncheck_item(user_id: int, position: int) -> Tuple[bool, str]:
+    item = (DailyChecklist
+            .select()
+            .where(DailyChecklist.user_id == user_id, DailyChecklist.sort_order == position)
+            .first())
+    if not item:
+        return False, "Invalid position."
+    item.last_checked = None
+    item.save()
+    return True, f"Item '{item.item}' unchecked."
+
 def list_items(user_id: int) -> List[DailyChecklist]:
-    current_day = get_current_day()
-    # Return the actual model objects
     return list(DailyChecklist
              .select()
              .where(DailyChecklist.user_id == user_id)
@@ -147,7 +156,7 @@ class EditDailyItemModal(discord.ui.Modal, title="Edit Daily Item"):
 
 def handle_daily_checklist_command(args: list[str], user) -> str:
     if not args:
-        return "Please provide a subcommand (add, remove, list, check, edit, move)"
+        return "Please provide a subcommand (add, remove, list, check, move, uncheck)"
 
     subcommand = args[0].lower()
     sub_args = args[1:]
@@ -192,6 +201,16 @@ def handle_daily_checklist_command(args: list[str], user) -> str:
             except ValueError:
                 return "Please provide a valid number for the position."
 
+        case "uncheck":
+            if not sub_args:
+                return "Please provide the position of the item to uncheck."
+            try:
+                position = int(sub_args[0])
+                success, msg = uncheck_item(user.id, position)
+                return msg
+            except ValueError:
+                return "Please provide a valid number for the position."
+
         case "move":
             if len(sub_args) < 2:
                 return "Please provide both old and new positions."
@@ -204,4 +223,4 @@ def handle_daily_checklist_command(args: list[str], user) -> str:
                 return "Please provide valid numbers for positions."
 
         case _:
-            return f"Invalid subcommand '{subcommand}'. Available subcommands: add, remove, list, check, move"
+            return f"Invalid subcommand '{subcommand}'. Available subcommands: add, remove, list, check, uncheck, move"

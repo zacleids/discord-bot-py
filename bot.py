@@ -503,10 +503,10 @@ async def daily_add_slash_command(interaction: discord.Interaction, item: str):
 
 
 # Subcommand `/daily remove`
-@daily_command_group.command(name="remove", description="Remove an item by its index")
+@daily_command_group.command(name="remove", description="Remove an item by its position")
 @log_interaction
-async def daily_remove_slash_command(interaction: discord.Interaction, index: discord.app_commands.Range[int, 1, 100]):
-    success, msg = daily_checklist.remove_item(interaction.user.id, index)
+async def daily_remove_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
+    success, msg = daily_checklist.remove_item(interaction.user.id, position)
     await interaction.response.send_message(msg, ephemeral=not success)
 
 
@@ -527,27 +527,35 @@ async def daily_list_slash_command(interaction: discord.Interaction):
 
 
 # Subcommand `/daily check`
-@daily_command_group.command(name="check", description="Mark an item as completed by its index")
+@daily_command_group.command(name="check", description="Mark an item as completed by its position")
 @log_interaction
-async def daily_check_slash_command(interaction: discord.Interaction, index: discord.app_commands.Range[int, 1, 100]):
-    success, msg = daily_checklist.check_item(interaction.user.id, index)
+async def daily_check_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
+    success, msg = daily_checklist.check_item(interaction.user.id, position)
+    await interaction.response.send_message(msg)
+
+
+# Subcommand `/daily uncheck`
+@daily_command_group.command(name="uncheck", description="Remove completion mark from an item")
+@log_interaction
+async def daily_uncheck_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
+    success, msg = daily_checklist.uncheck_item(interaction.user.id, position)
     await interaction.response.send_message(msg)
 
 
 # Subcommand `/daily edit`
 @daily_command_group.command(name="edit", description="Edit an item in your checklist")
 @log_interaction
-async def daily_edit_slash_command(interaction: discord.Interaction, index: discord.app_commands.Range[int, 1, 100]):
+async def daily_edit_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
     items = daily_checklist.list_items(interaction.user.id)
-    if not items or index > len(items):
+    if not items or position > len(items):
         await interaction.response.send_message("Invalid index.", ephemeral=True)
         return
     
     await interaction.response.send_modal(
         daily_checklist.EditDailyItemModal(
             interaction.user.id,
-            index,
-            items[index-1].item  # Changed to access .item directly
+            position,
+            items[position-1].item
         )
     )
 
