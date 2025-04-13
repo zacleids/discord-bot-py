@@ -514,16 +514,10 @@ async def daily_remove_slash_command(interaction: discord.Interaction, position:
 @daily_command_group.command(name="list", description="List your daily checklist items")
 @log_interaction
 async def daily_list_slash_command(interaction: discord.Interaction):
-    items = daily_checklist.list_items(interaction.user.id)
-    if items:
-        current_day = daily_checklist.get_current_day()
-        response = "**Your Daily Checklist:**\n"
-        for idx, item in enumerate(items, start=1):
-            status = "✅" if item.last_checked == current_day else "❌"
-            response += f"{item.sort_order}. {item.item} [{status}]\n"
-        await interaction.response.send_message(response)
-    else:
-        await interaction.response.send_message("Your daily checklist is empty.")
+    current_day = daily_checklist.get_current_day()
+    items = daily_checklist.get_checklist_for_date(interaction.user.id, current_day)
+    response = daily_checklist.format_checklist_response(items, current_day)
+    await interaction.response.send_message(response)
 
 
 # Subcommand `/daily check`
@@ -568,6 +562,24 @@ async def daily_move_slash_command(interaction: discord.Interaction,
     new_position: discord.app_commands.Range[int, 1, 100]):
     success, msg = daily_checklist.move_item(interaction.user.id, old_position, new_position)
     await interaction.response.send_message(msg)
+
+
+# Subcommand `/daily history`
+@daily_command_group.command(name="history", description="View your checklist for a specific date")
+@log_interaction
+async def daily_history_slash_command(interaction: discord.Interaction, date: str):  # Format: YYYY-MM-DD
+    try:
+        if date:
+            target_date = datetime.strptime(date, "%Y-%m-%d").date()
+        else:
+            target_date = daily_checklist.get_current_day()
+    except ValueError:
+        await interaction.response.send_message("Invalid date format. Please use YYYY-MM-DD", ephemeral=True)
+        return
+
+    items = daily_checklist.get_checklist_for_date(interaction.user.id, target_date)
+    response = daily_checklist.format_checklist_response(items, target_date)
+    await interaction.response.send_message(response)
 
 
 # https://fallendeity.github.io/discord.py-masterclass/slash-commands/#error-handling-and-checks

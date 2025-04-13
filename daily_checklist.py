@@ -1,6 +1,6 @@
 import datetime
 import pytz
-from peewee import Model, IntegerField, CharField, DateField, SQL
+from peewee import Model, IntegerField, CharField, DateField, SQL, DateTimeField, ForeignKeyField
 from db.db import orm_db
 from typing import Tuple, List
 import discord
@@ -8,10 +8,20 @@ import discord
 class DailyChecklist(Model):
     user_id = IntegerField()
     item = CharField()
-    last_checked = DateField(null=True)   # stores last day this item was checked
     sort_order = IntegerField(constraints=[SQL('DEFAULT 0')])
+    deleted_at = DateTimeField(null=True)  # For soft deletes
+    created_at = DateTimeField(default=datetime.datetime.now)  # Add created_at field
     class Meta:
         database = orm_db
+
+class DailyChecklistCheck(Model):
+    checklist_item = ForeignKeyField(DailyChecklist, backref='checks')
+    checked_at = DateField()  # Stores the day this was checked (in PT)
+    class Meta:
+        database = orm_db
+        indexes = (
+            (('checklist_item', 'checked_at'), True),  # Unique together
+        )
 
 def get_current_day() -> datetime.date:
     tz = pytz.timezone("America/Los_Angeles")
@@ -24,70 +34,126 @@ def add_item(user_id: int, item: str) -> DailyChecklist:
     # Get max sort_order for this user
     max_order = (DailyChecklist
                  .select(DailyChecklist.sort_order)
-                 .where(DailyChecklist.user_id == user_id)
+                 .where(DailyChecklist.user_id == user_id, DailyChecklist.deleted_at.is_null())
                  .order_by(DailyChecklist.sort_order.desc())
                  .first())
     next_order = (max_order.sort_order + 1) if max_order else 1  # Start at 1
-    return DailyChecklist.create(user_id=user_id, item=item, last_checked=None, sort_order=next_order)
+    return DailyChecklist.create(user_id=user_id, item=item, sort_order=next_order)
 
 def remove_item(user_id: int, position: int) -> Tuple[bool, str]:
     # Find item by sort_order directly
     item = (DailyChecklist
             .select()
-            .where(DailyChecklist.user_id == user_id, DailyChecklist.sort_order == position)
+            .where(DailyChecklist.user_id == user_id, 
+                   DailyChecklist.sort_order == position,
+                   DailyChecklist.deleted_at.is_null())
             .first())
     if not item:
         return False, "Invalid position."
     
-    # Delete the item and reorder remaining items
+    # Soft delete the item and set its sort_order to 0
     with orm_db.atomic():
-        # Delete the target item
-        item.delete_instance()
-        # Shift down all items after this one
+        # First shift down all items after this one
         query = (DailyChecklist
                 .update({DailyChecklist.sort_order: DailyChecklist.sort_order - 1})
-                .where(DailyChecklist.user_id == user_id, 
-                       DailyChecklist.sort_order > position))
+                .where(DailyChecklist.user_id == user_id,
+                       DailyChecklist.sort_order > position,
+                       DailyChecklist.deleted_at.is_null()))
         query.execute()
+        
+        # Then mark this item as deleted and reset its sort order
+        item.deleted_at = datetime.datetime.now()
+        item.sort_order = 0  # Reset sort_order when deleted
+        item.save()
+    
     return True, "Item removed."
 
 def check_item(user_id: int, position: int) -> Tuple[bool, str]:
     current_day = get_current_day()
-    # Find item by sort_order directly
     item = (DailyChecklist
             .select()
-            .where(DailyChecklist.user_id == user_id, DailyChecklist.sort_order == position)
+            .where(DailyChecklist.user_id == user_id,
+                   DailyChecklist.sort_order == position,
+                   DailyChecklist.deleted_at.is_null())
             .first())
     if not item:
         return False, "Invalid position."
-    if item.last_checked == current_day:
+
+    _, is_checked = is_item_checked(item, current_day)
+    if is_checked:
         return False, "Item already checked for today."
-    item.last_checked = current_day
-    item.save()
+
+    DailyChecklistCheck.create(
+        checklist_item=item,
+        checked_at=current_day
+    )
     return True, f"Item '{item.item}' marked as completed for today."
 
 def uncheck_item(user_id: int, position: int) -> Tuple[bool, str]:
+    current_day = get_current_day()
     item = (DailyChecklist
             .select()
-            .where(DailyChecklist.user_id == user_id, DailyChecklist.sort_order == position)
+            .where(DailyChecklist.user_id == user_id,
+                   DailyChecklist.sort_order == position,
+                   DailyChecklist.deleted_at.is_null())
             .first())
     if not item:
         return False, "Invalid position."
-    item.last_checked = None
-    item.save()
+
+    check = DailyChecklistCheck.get_or_none(
+        checklist_item=item,
+        checked_at=current_day
+    )
+    if not check:
+        return False, "Item is not checked."
+    
+    check.delete_instance()
     return True, f"Item '{item.item}' unchecked."
 
+def is_item_checked(item: DailyChecklist, day: datetime.date) -> Tuple[DailyChecklistCheck, bool]:
+    check = DailyChecklistCheck.get_or_none(
+        checklist_item=item,
+        checked_at=day
+    )
+    return check, check is not None
+
 def list_items(user_id: int) -> List[DailyChecklist]:
+    """List current active items. For display, use get_checklist_for_date instead."""
     return list(DailyChecklist
              .select()
-             .where(DailyChecklist.user_id == user_id)
+             .where(DailyChecklist.user_id == user_id,
+                    DailyChecklist.deleted_at.is_null())
              .order_by(DailyChecklist.sort_order))
+
+def get_checklist_for_date(user_id: int, date: datetime.date) -> List[Tuple[DailyChecklist, bool]]:
+    """Get checklist items and their check status for a specific date"""
+    # Convert date to datetime in PT for proper day boundaries (4am cutoff)
+    tz = pytz.timezone("America/Los_Angeles")
+    date_start = datetime.datetime.combine(date, datetime.time(4, 0))  # 4am PT on the target date
+    date_start = tz.localize(date_start)
+    date_end = date_start + datetime.timedelta(days=1)  # 4am PT the next day
+    
+    # Convert to UTC for database comparison since created_at is stored in UTC
+    date_start_utc = date_start.astimezone(pytz.UTC)
+    date_end_utc = date_end.astimezone(pytz.UTC)
+    
+    items = list(DailyChecklist
+                 .select()
+                 .where(
+                     DailyChecklist.user_id == user_id,
+                     DailyChecklist.created_at <= date_end_utc,  # Item existed on that date
+                     (DailyChecklist.deleted_at.is_null()) |  # Either not deleted
+                     (DailyChecklist.deleted_at > date_end_utc)   # Or deleted after that date
+                 )
+                 .order_by(DailyChecklist.sort_order))
+    
+    return [(item, is_item_checked(item, date)[1]) for item in items]
 
 def edit_item(user_id: int, position: int, new_text: str) -> Tuple[bool, str]:
     # Find item by sort_order directly
     item = (DailyChecklist
             .select()
-            .where(DailyChecklist.user_id == user_id, DailyChecklist.sort_order == position)
+            .where(DailyChecklist.user_id == user_id, DailyChecklist.sort_order == position, DailyChecklist.deleted_at.is_null())
             .first())
     if not item:
         return False, "Invalid position."
@@ -99,7 +165,7 @@ def move_item(user_id: int, old_pos: int, new_pos: int) -> Tuple[bool, str]:
     # Verify positions are valid
     count = (DailyChecklist
              .select()
-             .where(DailyChecklist.user_id == user_id)
+             .where(DailyChecklist.user_id == user_id, DailyChecklist.deleted_at.is_null())
              .count())
     if old_pos < 1 or old_pos > count or new_pos < 1 or new_pos > count:
         return False, "Invalid position."
@@ -108,7 +174,8 @@ def move_item(user_id: int, old_pos: int, new_pos: int) -> Tuple[bool, str]:
     item_to_move = (DailyChecklist
                     .select()
                     .where(DailyChecklist.user_id == user_id, 
-                           DailyChecklist.sort_order == old_pos)
+                           DailyChecklist.sort_order == old_pos,
+                           DailyChecklist.deleted_at.is_null())
                     .first())
     if not item_to_move:
         return False, "Item not found."
@@ -120,7 +187,8 @@ def move_item(user_id: int, old_pos: int, new_pos: int) -> Tuple[bool, str]:
              .update({DailyChecklist.sort_order: DailyChecklist.sort_order - 1})
              .where(DailyChecklist.user_id == user_id,
                     DailyChecklist.sort_order > old_pos,
-                    DailyChecklist.sort_order <= new_pos)
+                    DailyChecklist.sort_order <= new_pos,
+                    DailyChecklist.deleted_at.is_null())
              .execute())
         else:
             # Moving up: shift items down
@@ -128,7 +196,8 @@ def move_item(user_id: int, old_pos: int, new_pos: int) -> Tuple[bool, str]:
              .update({DailyChecklist.sort_order: DailyChecklist.sort_order + 1})
              .where(DailyChecklist.user_id == user_id,
                     DailyChecklist.sort_order >= new_pos,
-                    DailyChecklist.sort_order < old_pos)
+                    DailyChecklist.sort_order < old_pos,
+                    DailyChecklist.deleted_at.is_null())
              .execute())
         
         item_to_move.sort_order = new_pos
@@ -154,9 +223,27 @@ class EditDailyItemModal(discord.ui.Modal, title="Edit Daily Item"):
         success, msg = edit_item(self.user_id, self.index, self.text_input.value)
         await interaction.response.send_message(msg, ephemeral=not success)
 
+def format_checklist_response(items: List[Tuple[DailyChecklist, bool]], date: datetime.date) -> str:
+    if not items:
+        return "Your daily checklist" + (f" for {date.strftime('%Y-%m-%d')}" if date != get_current_day() else "") + " is empty."
+    
+    header = "**Your Daily Checklist" + (f" for {date.strftime('%Y-%m-%d')}" if date != get_current_day() else "") + ":**\n"
+    
+    all_checked = all(checked for _, checked in items)
+    response_lines = [
+        f"{item.sort_order}. {item.item} [{'✅' if checked else '❌'}]"
+        for item, checked in items
+    ]
+    
+    response = header + "\n".join(response_lines)
+    if all_checked and items:  # Only congratulate if there are items and all are checked
+        response += "\n\n🎉 Congratulations! All items completed!"
+    
+    return response
+
 def handle_daily_checklist_command(args: list[str], user) -> str:
     if not args:
-        return "Please provide a subcommand (add, remove, list, check, move, uncheck)"
+        return "Please provide a subcommand (add, remove, list, check, uncheck, move, history)"
 
     subcommand = args[0].lower()
     sub_args = args[1:]
@@ -170,16 +257,9 @@ def handle_daily_checklist_command(args: list[str], user) -> str:
             return f"Item added: {item}"
 
         case "list":
-            items = list_items(user.id)
-            if not items:
-                return "Your daily checklist is empty."
-            
-            response = "**Your Daily Checklist:**\n"
             current_day = get_current_day()
-            for idx, item in enumerate(items, start=1):
-                status = "✅" if item.last_checked == current_day else "❌"
-                response += f"{item.sort_order}. {item.item} [{status}])\n"
-            return response
+            items = get_checklist_for_date(user.id, current_day)
+            return format_checklist_response(items, current_day)
 
         case "remove":
             if not sub_args:
@@ -222,5 +302,16 @@ def handle_daily_checklist_command(args: list[str], user) -> str:
             except ValueError:
                 return "Please provide valid numbers for positions."
 
+        case "history":
+            try:
+                if sub_args:
+                    target_date = datetime.datetime.strptime(sub_args[0], "%Y-%m-%d").date()
+                else:
+                    target_date = get_current_day()
+                items = get_checklist_for_date(user.id, target_date)
+                return format_checklist_response(items, target_date)
+            except ValueError:
+                return "Invalid date format. Please use YYYY-MM-DD"
+
         case _:
-            return f"Invalid subcommand '{subcommand}'. Available subcommands: add, remove, list, check, uncheck, move"
+            return f"Invalid subcommand '{subcommand}'. Available subcommands: add, remove, list, check, uncheck, move, history"
