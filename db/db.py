@@ -13,6 +13,7 @@ import todo
 from hangman import HangmanGame, orm_db
 from reminder import Reminder
 from time_funcs import WorldClock
+from daily_checklist import DailyChecklist, DailyChecklistCheck
 
 
 def create_dbs():
@@ -28,4 +29,4 @@ def create_dbs():
         print("DB already exists")
 
     orm_db.connect()
-    orm_db.create_tables([HangmanGame, Reminder, WorldClock])
+    orm_db.create_tables([HangmanGame, Reminder, WorldClock, DailyChecklist, DailyChecklistCheck])

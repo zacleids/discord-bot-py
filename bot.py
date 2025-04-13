@@ -23,6 +23,7 @@ import rps
 import time_funcs
 import todo
 import text_transform
+import daily_checklist
 from errors import InvalidInputError
 from log_interaction import log_interaction
 from reminder import Reminder, EditReminderModal
@@ -51,6 +52,9 @@ tree.add_command(hangman_command_group)
 
 reminder_command_group = discord.app_commands.Group(name="reminder", description="Set a reminder")
 tree.add_command(reminder_command_group)
+
+daily_command_group = discord.app_commands.Group(name="daily", description="Manage your daily checklist")
+tree.add_command(daily_command_group)
 
 command_prefix = os.getenv('COMMAND_PREFIX', "!")
 
@@ -135,6 +139,8 @@ async def on_message(message: discord.Message):
                 result = encode.handle_encode_decode_command(args, "decode")
             case "transform":
                 result = text_transform.handle_text_transform_command(args)
+            case "daily":
+                result = daily_checklist.handle_daily_checklist_command(args, message.author)
             case _:
                 result = "Command not recognized."
         if files:
@@ -486,6 +492,94 @@ async def reminder_edit_slash_command(interaction: discord.Interaction, reminder
         await interaction.response.send_modal(EditReminderModal(reminder_instance.id, reminder_instance.message, reminder_instance.remind_at))
     else:
         await interaction.response.send_message(f"Reminder `{reminder}` not found.", ephemeral=True)
+
+
+# Subcommand `/daily add`
+@daily_command_group.command(name="add", description="Add an item to your daily checklist")
+@log_interaction
+async def daily_add_slash_command(interaction: discord.Interaction, item: str):
+    daily_checklist.add_item(interaction.user.id, item)
+    await interaction.response.send_message(f"Item added: {item}")
+
+
+# Subcommand `/daily remove`
+@daily_command_group.command(name="remove", description="Remove an item by its position")
+@log_interaction
+async def daily_remove_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
+    success, msg = daily_checklist.remove_item(interaction.user.id, position)
+    await interaction.response.send_message(msg, ephemeral=not success)
+
+
+# Subcommand `/daily list`
+@daily_command_group.command(name="list", description="List your daily checklist items")
+@log_interaction
+async def daily_list_slash_command(interaction: discord.Interaction):
+    current_day = daily_checklist.get_current_day()
+    items = daily_checklist.get_checklist_for_date(interaction.user.id, current_day)
+    response = daily_checklist.format_checklist_response(items, current_day)
+    await interaction.response.send_message(response)
+
+
+# Subcommand `/daily check`
+@daily_command_group.command(name="check", description="Mark an item as completed by its position")
+@log_interaction
+async def daily_check_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
+    success, msg = daily_checklist.check_item(interaction.user.id, position)
+    await interaction.response.send_message(msg)
+
+
+# Subcommand `/daily uncheck`
+@daily_command_group.command(name="uncheck", description="Remove completion mark from an item")
+@log_interaction
+async def daily_uncheck_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
+    success, msg = daily_checklist.uncheck_item(interaction.user.id, position)
+    await interaction.response.send_message(msg)
+
+
+# Subcommand `/daily edit`
+@daily_command_group.command(name="edit", description="Edit an item in your checklist")
+@log_interaction
+async def daily_edit_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
+    items = daily_checklist.list_items(interaction.user.id)
+    if not items or position > len(items):
+        await interaction.response.send_message("Invalid index.", ephemeral=True)
+        return
+    
+    await interaction.response.send_modal(
+        daily_checklist.EditDailyItemModal(
+            interaction.user.id,
+            position,
+            items[position-1].item
+        )
+    )
+
+
+# Subcommand `/daily move`
+@daily_command_group.command(name="move", description="Move an item to a different position")
+@log_interaction
+async def daily_move_slash_command(interaction: discord.Interaction, 
+    old_position: discord.app_commands.Range[int, 1, 100],
+    new_position: discord.app_commands.Range[int, 1, 100]):
+    success, msg = daily_checklist.move_item(interaction.user.id, old_position, new_position)
+    await interaction.response.send_message(msg)
+
+
+# Subcommand `/daily history`
+@daily_command_group.command(name="history", description="View your checklist for a specific date")
+@log_interaction
+async def daily_history_slash_command(interaction: discord.Interaction, date: str):  # Format: YYYY-MM-DD
+    try:
+        if date:
+            target_date = datetime.strptime(date, "%Y-%m-%d").date()
+        else:
+            target_date = daily_checklist.get_current_day()
+    except ValueError:
+        await interaction.response.send_message("Invalid date format. Please use YYYY-MM-DD", ephemeral=True)
+        return
+
+    items = daily_checklist.get_checklist_for_date(interaction.user.id, target_date)
+    response = daily_checklist.format_checklist_response(items, target_date)
+    await interaction.response.send_message(response)
 
 
 # https://fallendeity.github.io/discord.py-masterclass/slash-commands/#error-handling-and-checks
