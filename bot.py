@@ -27,11 +27,10 @@ import daily_checklist
 from errors import InvalidInputError
 from log_interaction import log_interaction
 from reminder import Reminder, EditReminderModal
+from config import Config
 
-# Load .env variables
-load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
-BOT_ADMIN_ID = int(os.getenv('BOT_ADMIN_ID'))
+# Initialize config
+config = Config()
 
 # Create bot instance
 intents = discord.Intents.default()
@@ -56,8 +55,6 @@ tree.add_command(reminder_command_group)
 daily_command_group = discord.app_commands.Group(name="daily", description="Manage your daily checklist")
 tree.add_command(daily_command_group)
 
-command_prefix = os.getenv('COMMAND_PREFIX', "!")
-
 # Ensure the database and tasks table are set up
 db.db.create_dbs()
 
@@ -75,12 +72,12 @@ async def on_message(message: discord.Message):
 
     message_content = message.content
 
-    if not message_content.startswith(command_prefix):
-        return  # Ignore message that don't start with the command prefix "!"
+    if not message_content.startswith(config.command_prefix):
+        return  # Ignore message that don't start with the command prefix
 
     print(f"! command \t\t| Server: {message.guild.name}, Channel: {message.channel.name}, Author: {message.author}, Content: {message.content}")
 
-    command_body = message_content[len(command_prefix):].split(" ")
+    command_body = message_content[len(config.command_prefix):].split(" ")
     command = command_body[0].lower()
     args = command_body[1:]
 
@@ -89,7 +86,7 @@ async def on_message(message: discord.Message):
         files = None
         match command:
             case "sync":
-                if message.author.id == BOT_ADMIN_ID:
+                if message.author.id == config.bot_admin_id:
                     await message.channel.send("Syncing commands...")
                     info = await tree.sync()
                     result = "Commands synced!"
@@ -631,5 +628,5 @@ async def before_check_reminders():
     await client.wait_until_ready()
 
 
-client.run(TOKEN)
+client.run(config.discord_token)
 
