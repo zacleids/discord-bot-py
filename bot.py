@@ -24,6 +24,7 @@ import time_funcs
 import todo
 import text_transform
 import daily_checklist
+import fortune
 from errors import InvalidInputError
 from log_interaction import log_interaction
 from reminder import Reminder, EditReminderModal
@@ -138,6 +139,8 @@ async def on_message(message: discord.Message):
                 result = text_transform.handle_text_transform_command(args)
             case "daily":
                 result = daily_checklist.handle_daily_checklist_command(args, message.author)
+            case "fortune":
+                result = fortune.get_fortune(message.author.id)
             case _:
                 result = "Command not recognized."
         if files:
@@ -239,6 +242,13 @@ async def color_slash_command(interaction: discord.Interaction, color_str: str =
 @log_interaction
 async def transform_slash_command(interaction: discord.Interaction, text: str, transform_type: text_transform.TransformChoice):
     result = text_transform.transform_text(text, transform_type)
+    await interaction.response.send_message(result)
+
+
+@tree.command(name="fortune", description="Get your fortune for today!")
+@log_interaction
+async def fortune_slash_command(interaction: discord.Interaction):
+    result = fortune.get_fortune(interaction.user.id)
     await interaction.response.send_message(result)
 
 
