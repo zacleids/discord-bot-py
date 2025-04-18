@@ -169,7 +169,7 @@ def convert_units(from_unit: UnitType, to_unit: UnitType, number: float) -> floa
     result = base_value / CONVERSION_FACTORS[to_unit]
     return result
 
-def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float, height_display: bool = False) -> str:
+def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float, height_display: bool = False, feet_inches_input: tuple[int, int] = None) -> str:
     result = convert_units(from_unit, to_unit, number)
     # Format input number to remove unnecessary .0
     if float(number).is_integer():
@@ -181,7 +181,17 @@ def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float
         total_inches = result * 12
         feet = int(total_inches // 12)
         inches = round(total_inches % 12)
+        # If input was feet/inches, display as 6 ft 2 in = 188 cm
+        if feet_inches_input:
+            left = f"{feet_inches_input[0]} ft {feet_inches_input[1]} in"
+            right = f"{result:.4g} {format_unit_name(to_unit)}"
+            return f"{left} = {right}"
         return f"{number_display} {format_unit_name(from_unit)} = {feet} ft {inches} in"
+    # If input was feet/inches, display as 6' 2" = 188 cm
+    if feet_inches_input:
+        left = f"{feet_inches_input[0]} ft {feet_inches_input[1]} in"
+        right = f"{result:.4g} {format_unit_name(to_unit)}"
+        return f"{left} = {right}"
     return f"{number_display} {format_unit_name(from_unit)} = {result:.4g} {format_unit_name(to_unit)}"
 
 def handle_conversion_command(args: list[str]) -> str:
