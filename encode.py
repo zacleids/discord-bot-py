@@ -72,17 +72,19 @@ def encode_decode(text, method, operation='encode'):
 
 def handle_encode_decode_command(args: list[str], operation: str) -> str:
     result = None
+    available_methods = ', '.join(list(methods.keys()) + ['all'])
+    usage_example = 'Usage: !encode <method> <text> (e.g., !encode base64 hello world)'
     if not args:
-        result = "Please provide a subcommand (encode, decode)."
+        result = f"Please provide an encode/decode method. Available methods: {available_methods}. {usage_example}"
     else:
         method = args[0].lower() if len(args) > 0 else None
         
         if method not in methods and method != "all":
-            raise ValueError(f"Unknown method: {method}")
+            raise ValueError(f"Unknown method: {method}. Available methods are: {available_methods}")
         
         text = ' '.join(args[1:])
         if not len(text) > 0:
-            raise ValueError("No text to encode/decode provided")
+            raise ValueError(f"No text to encode/decode provided. {usage_example}")
 
         try:
             if method == "all" and operation == "encode":
