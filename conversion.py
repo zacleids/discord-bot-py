@@ -156,13 +156,13 @@ def parse_unit(unit_str: str) -> UnitType:
 def format_unit_name(unit: UnitType, value: float = 1) -> str:
     # Capitalize first letter, rest lowercase, replace underscores with spaces if any
     name = unit.name.capitalize().replace('_', ' ')
-    # Pluralize unless it's ft or in
+
     if abs(value) != 1:
         name += "s"
     # Handle special case for fluid ounce
     if name == "Fluid ounce" and abs(value) != 1:
         name = "Fluid Ounces"
-    # Handle special case for feet and inches
+    # Handle special case for feet
     if name == "Foot" and abs(value) != 1:
         name = "Feet"
     return name
