@@ -25,6 +25,7 @@ import todo
 import text_transform
 import daily_checklist
 import fortune
+import conversion
 from errors import InvalidInputError
 from log_interaction import log_interaction
 from reminder import Reminder, EditReminderModal
@@ -150,6 +151,8 @@ async def on_message(message: discord.Message):
                 result = daily_checklist.handle_daily_checklist_command(args, message.author)
             case "fortune":
                 result = fortune.get_fortune(message.author.id)
+            case "conversion":
+                result = conversion.handle_conversion_command(args)
             case _:
                 result = "Command not recognized."
         if files:
@@ -259,6 +262,24 @@ async def transform_slash_command(interaction: discord.Interaction, text: str, t
 async def fortune_slash_command(interaction: discord.Interaction):
     result = fortune.get_fortune(interaction.user.id)
     await interaction.response.send_message(result)
+
+
+@tree.command(name="conversion", description="Convert between units (length, mass, volume)")
+@log_interaction
+async def conversion_slash_command(
+    interaction: discord.Interaction,
+    from_unit: conversion.UnitTypeChoice,
+    to_unit: conversion.UnitTypeChoice,
+    number: float,
+    height_display: bool = False
+):
+    try:
+        from_enum = conversion.parse_unit(from_unit.value)
+        to_enum = conversion.parse_unit(to_unit.value)
+        result = conversion.get_conversion_display(from_enum, to_enum, number, height_display=height_display)
+        await interaction.response.send_message(result)
+    except ValueError as e:
+        await interaction.response.send_message(str(e))
 
 
 # Subcommand `/todo add`
