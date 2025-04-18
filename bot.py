@@ -283,6 +283,7 @@ async def conversion_slash_command(
 
 
 @tree.command(name="height", description="Convert between feet/inches and centimeters")
+@log_interaction
 async def height_slash_command(
     interaction: discord.Interaction,
     feet: int = None,
