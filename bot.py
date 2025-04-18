@@ -29,6 +29,7 @@ from errors import InvalidInputError
 from log_interaction import log_interaction
 from reminder import Reminder, EditReminderModal
 from config import Config
+from utils import guild_only
 
 # Initialize config
 config = Config()
@@ -76,7 +77,12 @@ async def on_message(message: discord.Message):
     if not message_content.startswith(config.command_prefix):
         return  # Ignore message that don't start with the command prefix
 
-    print(f"! command \t\t| Server: {message.guild.name}, Channel: {message.channel.name}, Author: {message.author}, Content: {message.content}")
+    # Support logging for both DMs and guild messages
+    if message.guild is not None:
+        log_str = f"! command \t\t| Server: {message.guild.name}, Channel: {message.channel.name}, Author: {message.author}, Content: {message.content}"
+    else:
+        log_str = f"! command \t\t| DM from: {message.author}, Content: {message.content}"
+    print(log_str)
 
     command_body = message_content[len(config.command_prefix):].split(" ")
     command = command_body[0].lower()
@@ -130,7 +136,10 @@ async def on_message(message: discord.Message):
             case "color":
                 result, files = color.handle_color_command(args)
             case "clock" | "clocks":
-                result = time_funcs.handle_world_clock_command(args, message.guild.id)
+                # Only use message.guild.id if in a guild, else use the user ID
+                # This is to support DMs
+                guild_id = message.guild.id if message.guild else message.author.id
+                result = time_funcs.handle_world_clock_command(args, guild_id)
             case "encode":
                 result = encode.handle_encode_decode_command(args, "encode")
             case "decode":
@@ -314,7 +323,9 @@ async def todo_edit_slash_command(interaction: discord.Interaction, position: in
 @clock_command_group.command(name="list", description="List all clocks in your world clock")
 @log_interaction
 async def clock_list_slash_command(interaction: discord.Interaction):
-    tzs = time_funcs.list_timezones(interaction.guild_id)
+    # Use user.id for DMs, guild_id for servers
+    key_id = interaction.guild_id if interaction.guild_id is not None else interaction.user.id
+    tzs = time_funcs.list_timezones(key_id)
     if tzs:
         response = time_funcs.format_tzs_response_str(tzs)
         await interaction.response.send_message(response)
@@ -333,42 +344,46 @@ async def clock_existing_list_autocomplete(interaction: discord.Interaction, cur
     return [discord.app_commands.Choice(name=option, value=option) for option in options if option.lower().startswith(current.lower())][:25]
 
 
-# Subcommand `/cock add`
+# Subcommand `/clock add`
 @clock_command_group.command(name="add", description="Add a clock to your world clock")
 @discord.app_commands.autocomplete(timezone=clock_full_list_autocomplete)
 @log_interaction
 async def clock_add_slash_command(interaction: discord.Interaction, timezone: str, label: str = None):
+    key_id = interaction.guild_id if interaction.guild_id is not None else interaction.user.id
     tz = time_funcs.get_valid_timezone(timezone)
-    result = time_funcs.add_timezone(interaction.guild_id, tz, label)
+    result = time_funcs.add_timezone(key_id, tz, label)
     await interaction.response.send_message(result)
 
 
-# Subcommand `/cock remove`
+# Subcommand `/clock remove`
 @clock_command_group.command(name="remove", description="Remove a clock to your world clock")
 @discord.app_commands.autocomplete(timezone=clock_existing_list_autocomplete)
 @log_interaction
 async def clock_remove_slash_command(interaction: discord.Interaction, timezone: str):
-    result = time_funcs.remove_timezone(interaction.guild_id, timezone)
+    key_id = interaction.guild_id if interaction.guild_id is not None else interaction.user.id
+    result = time_funcs.remove_timezone(key_id, timezone)
     await interaction.response.send_message(result)
 
 
-# Subcommand `/cock edit`
+# Subcommand `/clock edit`
 @clock_command_group.command(name="edit", description="Edit a clock label from your world clock")
 @discord.app_commands.autocomplete(timezone=clock_existing_list_autocomplete)
 @log_interaction
 async def clock_edit_slash_command(interaction: discord.Interaction, timezone: str):
-    existing_tz = time_funcs.get_timezone(interaction.guild_id, timezone)
+    key_id = interaction.guild_id if interaction.guild_id is not None else interaction.user.id
+    existing_tz = time_funcs.get_timezone(key_id, timezone)
 
     if existing_tz is None:
         await interaction.response.send_message("Timezone not found.")
         return
 
     # Send the modal
-    await interaction.response.send_modal(time_funcs.EditTimezoneLabelModal(interaction.guild_id, timezone, existing_tz.label if existing_tz.label else ""))
+    await interaction.response.send_modal(time_funcs.EditTimezoneLabelModal(key_id, timezone, existing_tz.label if existing_tz.label else ""))
 
 
 # Subcommand `/hangman startgame`
 @hangman_command_group.command(name="startgame", description="Start a game of hangman")
+@guild_only
 @log_interaction
 async def hangman_startgame_slash_command(interaction: discord.Interaction, phrase: str, num_guesses: discord.app_commands.Range[int, 1, 26] = None):
     valid, error_msg = hangman.validate_chars(phrase)
@@ -390,6 +405,7 @@ async def hangman_startgame_slash_command(interaction: discord.Interaction, phra
 
 # Subcommand `/hangman display`
 @hangman_command_group.command(name="display", description="Display the state of the current hangman game")
+@guild_only
 @log_interaction
 async def hangman_display_slash_command(interaction: discord.Interaction):
     hg = hangman.get_active_hangman_game(interaction.guild_id)
@@ -404,6 +420,7 @@ async def hangman_display_slash_command(interaction: discord.Interaction):
 
 # Subcommand `/hangman guess`
 @hangman_command_group.command(name="guess", description="Guess some letters for the current hangman game")
+@guild_only
 @log_interaction
 async def hangman_guess_slash_command(interaction: discord.Interaction, guess: str):
     valid, error_msg = hangman.validate_chars(guess)
@@ -434,8 +451,9 @@ async def reminder_add_slash_command(interaction: discord.Interaction, message: 
                                      user: discord.User = None, is_private: bool = False):
     user = user or interaction.user  # Default to the interaction user if no mention
     remind_time = datetime.now() + timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
-
-    Reminder.create(user_id=user.id, guild_id=interaction.guild_id, channel_id=interaction.channel_id, message=message, remind_at=remind_time, is_private=is_private)
+    guild_id = interaction.guild_id if interaction.guild_id is not None else user.id
+    channel_id = interaction.channel_id if interaction.channel_id is not None else interaction.channel.id
+    Reminder.create(user_id=user.id, guild_id=guild_id, channel_id=channel_id, message=message, remind_at=remind_time, is_private=is_private)
 
     if is_private:
         await interaction.response.send_message(f"Reminder set for {discord.utils.format_dt(remind_time, style='F')}! (Private reminder)", ephemeral=True) # only the creating user can see this
@@ -622,6 +640,11 @@ async def check_reminders():
                 channel = client.get_channel(r.channel_id)
                 if channel:
                     await channel.send(f"⏰ Reminder for <@{r.user_id}>: {r.message}")
+                else:
+                    # If channel is None, try sending as DM (for DM reminders)
+                    user = await client.fetch_user(r.user_id)
+                    if user:
+                        await user.send(f"⏰ Reminder: {r.message}")
 
             # Delete the reminder after sending it
             r.delete_instance()

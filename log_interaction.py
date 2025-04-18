@@ -17,7 +17,11 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
         # If interaction is found, log its details
         if interaction:
             server_name = interaction.guild.name if interaction.guild else "DM"
-            channel_name = interaction.channel.name if interaction.channel else "DM"
+            # Safely get channel name or DM info
+            if hasattr(interaction.channel, "name"):
+                channel_name = interaction.channel.name
+            else:
+                channel_name = f"DM with {interaction.user.name}"
             user_name = interaction.user.name
             log_message = f"/ interaction \t| Server: {server_name}, Channel: {channel_name}, Author: {user_name}"
 
