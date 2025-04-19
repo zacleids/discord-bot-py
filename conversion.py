@@ -153,9 +153,19 @@ def parse_unit(unit_str: str) -> UnitType:
     except KeyError:
         raise KeyError(f"Unknown unit: {unit_str}")
 
-def format_unit_name(unit: UnitType) -> str:
+def format_unit_name(unit: UnitType, value: float = 1) -> str:
     # Capitalize first letter, rest lowercase, replace underscores with spaces if any
-    return unit.name.capitalize().replace('_', '_')
+    name = unit.name.capitalize().replace('_', ' ')
+
+    if abs(value) != 1:
+        name += "s"
+    # Handle special case for fluid ounce
+    if name == "Fluid ounce" and abs(value) != 1:
+        name = "Fluid Ounces"
+    # Handle special case for feet
+    if name == "Foot" and abs(value) != 1:
+        name = "Feet"
+    return name
 
 def format_unit_category(unit: UnitType) -> str:
     return unit.category.value
@@ -169,20 +179,41 @@ def convert_units(from_unit: UnitType, to_unit: UnitType, number: float) -> floa
     result = base_value / CONVERSION_FACTORS[to_unit]
     return result
 
-def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float, height_display: bool = False) -> str:
+def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float, height_display: bool = False, feet_inches_input: tuple[int, int] = None) -> str:
     result = convert_units(from_unit, to_unit, number)
     # Format input number to remove unnecessary .0
     if float(number).is_integer():
         number_display = str(int(number))
     else:
         number_display = str(number)
+
     # Special case: height_display for feet
     if height_display and to_unit == UnitType.FOOT:
         total_inches = result * 12
         feet = int(total_inches // 12)
         inches = round(total_inches % 12)
-        return f"{number_display} {format_unit_name(from_unit)} = {feet} ft {inches} in"
-    return f"{number_display} {format_unit_name(from_unit)} = {result:.4g} {format_unit_name(to_unit)}"
+        # If input was feet/inches, display as 6 ft 2 in = 188 cm
+        if feet_inches_input:
+            f, i = feet_inches_input
+            if i:
+                left = f"{f} ft {i} in"
+            else:
+                left = f"{f} ft"
+            right = f"{result:.4g} {format_unit_name(to_unit, result)}"
+            return f"{left} = {right}"
+        return f"{number_display} {format_unit_name(from_unit, number)} = {feet} ft {inches} in"
+    
+    # If input was feet/inches, display as 6' 2" = 188 cm
+    if feet_inches_input:
+        f, i = feet_inches_input
+        if i:
+            left = f"{f} ft {i} in"
+        else:
+            left = f"{f} ft"
+        right = f"{result:.4g} {format_unit_name(to_unit, result)}"
+        return f"{left} = {right}"
+    
+    return f"{number_display} {format_unit_name(from_unit, number)} = {result:.4g} {format_unit_name(to_unit, result)}"
 
 def handle_conversion_command(args: list[str]) -> str:
     usage = "Usage: !conversion <from_unit> <to_unit> <number> (e.g., !conversion meter foot 10)"

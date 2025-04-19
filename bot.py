@@ -282,6 +282,35 @@ async def conversion_slash_command(
         await interaction.response.send_message(str(e))
 
 
+@tree.command(name="height", description="Convert between feet/inches and centimeters")
+@log_interaction
+async def height_slash_command(
+    interaction: discord.Interaction,
+    feet: int = None,
+    inches: int = None,
+    centimeters: float = None
+):
+    # If centimeters is provided, do not allow feet or inches
+    if centimeters is not None:
+        if feet is not None or inches is not None:
+            await interaction.response.send_message("Please provide either centimeters OR feet/inches, not both.")
+            return
+        from_unit = conversion.UnitType.CENTIMETER
+        to_unit = conversion.UnitType.FOOT
+        result = conversion.get_conversion_display(from_unit, to_unit, centimeters, height_display=True)
+        await interaction.response.send_message(result)
+        return
+    # Otherwise, convert feet/inches to centimeters
+    if feet is not None or inches is not None:
+        total_inches = feet * 12 + (inches or 0)
+        from_unit = conversion.UnitType.INCH
+        to_unit = conversion.UnitType.CENTIMETER
+        result = conversion.get_conversion_display(from_unit, to_unit, total_inches, feet_inches_input=(feet, inches))
+        await interaction.response.send_message(result)
+        return
+    await interaction.response.send_message("Please provide either centimeters or feet (and optionally inches) to convert.", ephemeral=True)
+
+
 # Subcommand `/todo add`
 @todo_command_group.command(name="add", description="Add a task to your todo list")
 @log_interaction
