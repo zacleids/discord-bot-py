@@ -26,11 +26,13 @@ import text_transform
 import daily_checklist
 import fortune
 import conversion
+import currency
 from errors import InvalidInputError
 from log_interaction import log_interaction
 from reminder import Reminder, EditReminderModal
 from config import Config
-from utils import guild_only
+from utils import format_number, guild_only
+from currency import CURRENCY_NAMES, get_currency_name
 
 # Initialize config
 config = Config()
@@ -153,6 +155,8 @@ async def on_message(message: discord.Message):
                 result = fortune.get_fortune(message.author.id)
             case "conversion":
                 result = conversion.handle_conversion_command(args)
+            case "currency":
+                result = currency.handle_currency_command(args)
             case _:
                 result = "Command not recognized."
         if files:
@@ -309,6 +313,36 @@ async def height_slash_command(
         await interaction.response.send_message(result)
         return
     await interaction.response.send_message("Please provide either centimeters or feet (and optionally inches) to convert.", ephemeral=True)
+
+
+# Provide choices for the dropdowns using CURRENCY_NAMES, with contains search
+async def currency_list_autocomplete(interaction: discord.Interaction, current: str):
+    current_lower = current.lower()
+    return [
+        discord.app_commands.Choice(name=f"{code} - {get_currency_name(code)}", value=code)
+        for code in CURRENCY_NAMES
+        if current_lower in code.lower() or current_lower in get_currency_name(code).lower()
+    ][:25]
+
+@tree.command(name="currency", description="Convert between currencies")
+@discord.app_commands.autocomplete(
+    from_currency=currency_list_autocomplete,
+    to_currency=currency_list_autocomplete
+    )
+@log_interaction
+async def currency_slash_command(
+    interaction: discord.Interaction,
+    from_currency: str,
+    to_currency: str,
+    amount: float
+):
+    try:
+        result = currency.convert_currency(from_currency, to_currency, amount)
+        await interaction.response.send_message(
+            f"{currency.format_number(amount)} {from_currency} = {currency.format_number(result)} {to_currency}"
+        )
+    except Exception as e:
+        await interaction.response.send_message(str(e), ephemeral=True)
 
 
 # Subcommand `/todo add`

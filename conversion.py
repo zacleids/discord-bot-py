@@ -1,5 +1,6 @@
 from enum import Enum
 from discord import app_commands
+from utils import format_number
 
 class UnitCategory(Enum):
     LENGTH = "length"
@@ -182,10 +183,7 @@ def convert_units(from_unit: UnitType, to_unit: UnitType, number: float) -> floa
 def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float, height_display: bool = False, feet_inches_input: tuple[int, int] = None) -> str:
     result = convert_units(from_unit, to_unit, number)
     # Format input number to remove unnecessary .0
-    if float(number).is_integer():
-        number_display = str(int(number))
-    else:
-        number_display = str(number)
+    number_display = format_number(number)
 
     # Special case: height_display for feet
     if height_display and to_unit == UnitType.FOOT:
@@ -199,7 +197,7 @@ def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float
                 left = f"{f} ft {i} in"
             else:
                 left = f"{f} ft"
-            right = f"{result:.4g} {format_unit_name(to_unit, result)}"
+            right = f"{format_number(result)} {format_unit_name(to_unit, result)}"
             return f"{left} = {right}"
         return f"{number_display} {format_unit_name(from_unit, number)} = {feet} ft {inches} in"
     
@@ -210,10 +208,10 @@ def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float
             left = f"{f} ft {i} in"
         else:
             left = f"{f} ft"
-        right = f"{result:.4g} {format_unit_name(to_unit, result)}"
+        right = f"{format_number(result)} {format_unit_name(to_unit, result)}"
         return f"{left} = {right}"
     
-    return f"{number_display} {format_unit_name(from_unit, number)} = {result:.4g} {format_unit_name(to_unit, result)}"
+    return f"{number_display} {format_unit_name(from_unit, number)} = {format_number(result)} {format_unit_name(to_unit, result)}"
 
 def handle_conversion_command(args: list[str]) -> str:
     usage = "Usage: !conversion <from_unit> <to_unit> <number> (e.g., !conversion meter foot 10)"

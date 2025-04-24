@@ -14,6 +14,14 @@ def range_validator(num: int, lower_bound: int, upper_bound: int) -> bool:
     return (num >= lower_bound) and (num <= upper_bound)
 
 
+def format_number(n, precision=4) -> str:
+    if isinstance(n, float) and n.is_integer():
+        return str(int(n))
+    if isinstance(n, int):
+        return str(n)
+    return f"{n:.{precision}g}"
+
+
 def guild_only(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
