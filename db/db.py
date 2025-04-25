@@ -5,6 +5,7 @@ from config import Config
 config = Config()
 orm_db = SqliteDatabase(config.db_orm_path)
 
+from currency import CurrencyRate
 import time_funcs
 import todo
 from hangman import HangmanGame, orm_db
@@ -24,4 +25,4 @@ def create_dbs():
         print("DB already exists")
 
     orm_db.connect()
-    orm_db.create_tables([HangmanGame, Reminder, WorldClock, DailyChecklist, DailyChecklistCheck])
+    orm_db.create_tables([HangmanGame, Reminder, WorldClock, DailyChecklist, DailyChecklistCheck, CurrencyRate])
