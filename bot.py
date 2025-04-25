@@ -32,7 +32,6 @@ from log_interaction import log_interaction
 from reminder import Reminder, EditReminderModal
 from config import Config
 from utils import format_number, guild_only
-from currency import CURRENCY_NAMES, get_currency_name
 
 # Initialize config
 config = Config()
@@ -319,9 +318,9 @@ async def height_slash_command(
 async def currency_list_autocomplete(interaction: discord.Interaction, current: str):
     current_lower = current.lower()
     return [
-        discord.app_commands.Choice(name=f"{code} - {get_currency_name(code)}", value=code)
-        for code in CURRENCY_NAMES
-        if current_lower in code.lower() or current_lower in get_currency_name(code).lower()
+        discord.app_commands.Choice(name=f"{code} - {currency.get_currency_name(code)}", value=code)
+        for code in currency.CURRENCY_NAMES
+        if current_lower in code.lower() or current_lower in currency.get_currency_name(code).lower()
     ][:25]
 
 @tree.command(name="currency", description="Convert between currencies")
@@ -339,7 +338,7 @@ async def currency_slash_command(
     try:
         result = currency.convert_currency(from_currency, to_currency, amount)
         await interaction.response.send_message(
-            f"{currency.format_number(amount)} {from_currency} = {currency.format_number(result)} {to_currency}"
+            f"{format_number(amount)} {from_currency} = {format_number(result)} {to_currency}"
         )
     except Exception as e:
         await interaction.response.send_message(str(e), ephemeral=True)
