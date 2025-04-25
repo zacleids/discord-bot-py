@@ -6,6 +6,7 @@ class UnitCategory(Enum):
     LENGTH = "length"
     MASS = "mass"
     VOLUME = "volume"
+    TEMPERATURE = "temperature"
 
 class UnitType(Enum):
     # Length
@@ -29,6 +30,10 @@ class UnitType(Enum):
     QUART = ("quart", UnitCategory.VOLUME)
     PINT = ("pint", UnitCategory.VOLUME)
     FLUID_OUNCE = ("fluid_ounce", UnitCategory.VOLUME)
+    # Temperature
+    CELSIUS = ("celsius", UnitCategory.TEMPERATURE)
+    FAHRENHEIT = ("fahrenheit", UnitCategory.TEMPERATURE)
+    KELVIN = ("kelvin", UnitCategory.TEMPERATURE)
 
     @property
     def category(self):
@@ -53,6 +58,9 @@ class UnitTypeChoice(Enum):
     Quart = "Quart"
     Pint = "Pint"
     Fluid_ounce = "Fluid ounce"
+    Celsius = "Celsius"
+    Fahrenheit = "Fahrenheit"
+    Kelvin = "Kelvin"
 
 # Conversion factors to base units (meter, gram, liter)
 CONVERSION_FACTORS = {
@@ -77,6 +85,7 @@ CONVERSION_FACTORS = {
     UnitType.QUART: 0.946353,
     UnitType.PINT: 0.473176,
     UnitType.FLUID_OUNCE: 0.0295735,
+    # Temperature handled separately
 }
 
 # Common names and abbreviations mapping to UnitType
@@ -142,6 +151,14 @@ UNIT_ALIASES = {
     "fluidounces": UnitType.FLUID_OUNCE,
     "fluid_ounce": UnitType.FLUID_OUNCE,
     "fluid_ounces": UnitType.FLUID_OUNCE,
+    # Temperature
+    "c": UnitType.CELSIUS,
+    "celsius": UnitType.CELSIUS,
+    "centigrade": UnitType.CELSIUS,
+    "f": UnitType.FAHRENHEIT,
+    "fahrenheit": UnitType.FAHRENHEIT,
+    "k": UnitType.KELVIN,
+    "kelvin": UnitType.KELVIN,
 }
 
 def parse_unit(unit_str: str) -> UnitType:
@@ -171,9 +188,36 @@ def format_unit_name(unit: UnitType, value: float = 1) -> str:
 def format_unit_category(unit: UnitType) -> str:
     return unit.category.value
 
+def convert_temperature(from_unit: UnitType, to_unit: UnitType, number: float) -> float:
+    if from_unit == UnitType.CELSIUS:
+        if to_unit == UnitType.FAHRENHEIT:
+            return number * 9/5 + 32
+        elif to_unit == UnitType.KELVIN:
+            return number + 273.15
+        else:
+            return number
+    elif from_unit == UnitType.FAHRENHEIT:
+        if to_unit == UnitType.CELSIUS:
+            return (number - 32) * 5/9
+        elif to_unit == UnitType.KELVIN:
+            return (number - 32) * 5/9 + 273.15
+        else:
+            return number
+    elif from_unit == UnitType.KELVIN:
+        if to_unit == UnitType.CELSIUS:
+            return number - 273.15
+        elif to_unit == UnitType.FAHRENHEIT:
+            return (number - 273.15) * 9/5 + 32
+        else:
+            return number
+    else:
+        raise ValueError("Unknown temperature unit.")
+
 def convert_units(from_unit: UnitType, to_unit: UnitType, number: float) -> float:
     if from_unit.category != to_unit.category:
         raise ValueError(f"Incompatible units: {format_unit_name(from_unit)} ({format_unit_category(from_unit)}) and {format_unit_name(to_unit)} ({format_unit_category(to_unit)}).")
+    if from_unit.category == UnitCategory.TEMPERATURE:
+        return convert_temperature(from_unit, to_unit, number)
     # Convert to base unit
     base_value = number * CONVERSION_FACTORS[from_unit]
     # Convert to target unit
@@ -182,8 +226,18 @@ def convert_units(from_unit: UnitType, to_unit: UnitType, number: float) -> floa
 
 def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float, height_display: bool = False, feet_inches_input: tuple[int, int] = None) -> str:
     result = convert_units(from_unit, to_unit, number)
-    # Format input number to remove unnecessary .0
     number_display = format_number(number)
+
+    # Special formatting for temperature
+    if from_unit.category == UnitCategory.TEMPERATURE and to_unit.category == UnitCategory.TEMPERATURE:
+        unit_symbols = {
+            UnitType.CELSIUS: "°C",
+            UnitType.FAHRENHEIT: "°F",
+            UnitType.KELVIN: "°K"
+        }
+        from_symbol = unit_symbols.get(from_unit, from_unit.name)
+        to_symbol = unit_symbols.get(to_unit, to_unit.name)
+        return f"{number_display}{from_symbol} = {format_number(result)}{to_symbol}"
 
     # Special case: height_display for feet
     if height_display and to_unit == UnitType.FOOT:
