@@ -1,12 +1,14 @@
 from enum import Enum
 from discord import app_commands
 from utils import format_number
+import math
 
 class UnitCategory(Enum):
     LENGTH = "length"
     MASS = "mass"
     VOLUME = "volume"
     TEMPERATURE = "temperature"
+    VELOCITY = "velocity"
 
 class UnitType(Enum):
     # Length
@@ -34,6 +36,10 @@ class UnitType(Enum):
     CELSIUS = ("celsius", UnitCategory.TEMPERATURE)
     FAHRENHEIT = ("fahrenheit", UnitCategory.TEMPERATURE)
     KELVIN = ("kelvin", UnitCategory.TEMPERATURE)
+    # Velocity
+    METER_PER_SECOND = ("meter_per_second", UnitCategory.VELOCITY)
+    KILOMETER_PER_HOUR = ("kilometer_per_hour", UnitCategory.VELOCITY)
+    MILE_PER_HOUR = ("mile_per_hour", UnitCategory.VELOCITY)
 
     @property
     def category(self):
@@ -61,6 +67,9 @@ class UnitTypeChoice(Enum):
     Celsius = "Celsius"
     Fahrenheit = "Fahrenheit"
     Kelvin = "Kelvin"
+    Meter_per_second = "Meter per second"
+    Kilometer_per_hour = "Kilometer per hour"
+    Mile_per_hour = "Mile per hour"
 
 # Conversion factors to base units (meter, gram, liter)
 CONVERSION_FACTORS = {
@@ -85,6 +94,10 @@ CONVERSION_FACTORS = {
     UnitType.QUART: 0.946353,
     UnitType.PINT: 0.473176,
     UnitType.FLUID_OUNCE: 0.0295735,
+    # Velocity to meter/second
+    UnitType.METER_PER_SECOND: 1.0,
+    UnitType.KILOMETER_PER_HOUR: 0.277778,  # 1 kph = 0.277778 m/s
+    UnitType.MILE_PER_HOUR: 0.44704,        # 1 mph = 0.44704 m/s
     # Temperature handled separately
 }
 
@@ -159,6 +172,23 @@ UNIT_ALIASES = {
     "fahrenheit": UnitType.FAHRENHEIT,
     "k": UnitType.KELVIN,
     "kelvin": UnitType.KELVIN,
+    # Velocity
+    "m/s": UnitType.METER_PER_SECOND,
+    "meterpersecond": UnitType.METER_PER_SECOND,
+    "meterspersecond": UnitType.METER_PER_SECOND,
+    "meter/sec": UnitType.METER_PER_SECOND,
+    "meters/sec": UnitType.METER_PER_SECOND,
+    "kph": UnitType.KILOMETER_PER_HOUR,
+    "km/h": UnitType.KILOMETER_PER_HOUR,
+    "kilometerperhour": UnitType.KILOMETER_PER_HOUR,
+    "kilometersperhour": UnitType.KILOMETER_PER_HOUR,
+    "kilometer/hour": UnitType.KILOMETER_PER_HOUR,
+    "kilometers/hour": UnitType.KILOMETER_PER_HOUR,
+    "mph": UnitType.MILE_PER_HOUR,
+    "mileperhour": UnitType.MILE_PER_HOUR,
+    "milesperhour": UnitType.MILE_PER_HOUR,
+    "mile/hour": UnitType.MILE_PER_HOUR,
+    "miles/hour": UnitType.MILE_PER_HOUR,
 }
 
 def parse_unit(unit_str: str) -> UnitType:
@@ -172,17 +202,34 @@ def parse_unit(unit_str: str) -> UnitType:
         raise KeyError(f"Unknown unit: {unit_str}")
 
 def format_unit_name(unit: UnitType, value: float = 1) -> str:
-    # Capitalize first letter, rest lowercase, replace underscores with spaces if any
     name = unit.name.capitalize().replace('_', ' ')
 
-    if abs(value) != 1:
-        name += "s"
-    # Handle special case for fluid ounce
-    if name == "Fluid ounce" and abs(value) != 1:
-        name = "Fluid Ounces"
-    # Handle special case for feet
-    if name == "Foot" and abs(value) != 1:
-        name = "Feet"
+    plural_map = {
+        "foot": "Feet",
+        "inch": "Inches",
+        "mile": "Miles",
+        "meter": "Meters",
+        "kilometer": "Kilometers",
+        "yard": "Yards",
+        "gram": "Grams",
+        "liter": "Liters",
+        "pound": "Pounds",
+        "ounce": "Ounces",
+        "fluid ounce": "Fluid Ounces"
+    }
+
+    def pluralize(word):
+        key = word.lower()
+        return plural_map.get(key, word + "s")
+
+    # Use math.isclose for float comparison, sometimes value is 1.0000000000000002 which we treat as 1
+    if not math.isclose(abs(value), 1.0, rel_tol=1e-9):
+        if " " in name:
+            first, rest = name.split(" ", 1)
+            first_plural = pluralize(first)
+            return f"{first_plural} {rest}"
+        else:
+            return pluralize(name)
     return name
 
 def format_unit_category(unit: UnitType) -> str:
