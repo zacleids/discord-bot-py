@@ -31,7 +31,7 @@ def flip_coins(args: list[str]) -> str:
         return "".join(arr)
 
     count = 0
-    for i in range(0, num):
+    for _ in range(0, num):
         count = count + random.getrandbits(1)
 
     return f"Heads: {count}\nTails: {num - count}"
