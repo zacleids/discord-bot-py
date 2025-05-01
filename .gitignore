@@ -314,6 +314,8 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij,python,windows
 
+.vscode/
+
 temp/
 
 db/bot.db
