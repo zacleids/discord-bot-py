@@ -27,7 +27,7 @@ def print_win_str(bot_choice: RPSChoice, player_choice: RPSChoice) -> str:
 
 def play_rock_paper_scissors(args: list[str]) -> str:
     if len(args) == 0:
-        raise InvalidInputError(r"Invalid input. please use choose rock, paper, or scissors")
+        raise InvalidInputError("Invalid input. please use choose rock, paper, or scissors")
 
     player_choice_str = " ".join(args).lower()
 
@@ -41,6 +41,6 @@ def play_rock_paper_scissors(args: list[str]) -> str:
     except ValueError:
         return random.choice([
             "I dont know what you're trying to pull",
-            f"I didnt know we were playing Rock, Paper, Scissors, and {player_choice_str}. How do you play?"
+            f"I didnt know we were playing Rock, Paper, Scissors, and {player_choice_str}. How do you play?",
             "That is neither rock, nor paper, nor scissors"
         ])
