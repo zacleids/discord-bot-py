@@ -1,5 +1,5 @@
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Tuple
 
 FORTUNES = [
@@ -101,4 +101,17 @@ def _get_deterministic_fortune(user_id: int, date: str) -> str:
     seed_str = f"{user_id}-{date}"
     rng = random.Random(seed_str)
     fortune = rng.choice(FORTUNES)
+
+    # Check yesterday's fortune
+    yesterday = (datetime.strptime(date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday_seed_str = f"{user_id}-{yesterday}"
+    yesterday_rng = random.Random(yesterday_seed_str)
+    yesterday_fortune = yesterday_rng.choice(FORTUNES)
+
+    # If today's fortune matches yesterday's, adjust the seed
+    if fortune == yesterday_fortune:
+        seed_str += "1"
+        rng = random.Random(seed_str)
+        fortune = rng.choice(FORTUNES)
+
     return fortune
