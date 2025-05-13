@@ -27,6 +27,23 @@ FORTUNES = [
     "You will have a moment of déjà vu.",
     "You will have an awkward encounter with a stranger.",
     "You will accidentally send a text to the wrong person.",
+    "You will become great if you believe in yourself.",
+    "If you have something good in your life, don't let it go!",
+    "If you feel you are right, stand firmly by your convictions.",
+    "Land is always on the mind of a flying bird.",
+    "The man on the top of the mountain did not fall there.",
+    "You will live long enough to open many fortune cookies.",
+    "You are very talented in many ways.",
+    "You will travel to many exotic places in your lifetime.",
+    "The greatest risk is not taking one.",
+    "Enjoy the good luck a companion brings you.",
+    "Hidden in a valley beside an open stream- This will be the type of place where you will find your dream.",
+    "Serious trouble will bypass you.",
+    "The world may be your oyster, but it doesn't mean you'll get its pearl.",
+    "A stranger, is a friend you have not spoken to yet.",
+    "You can make your own happiness.",
+    "When fear hurts you, conquer it and defeat it!",
+    "You are very talented in many ways.",
     # Silly fortunes
     "You will step on a LEGO today. Beware.",
     "A duck will judge you silently from afar.",
@@ -39,6 +56,7 @@ FORTUNES = [
     "You will win an imaginary argument today.",
     "Your left shoe will feel slightly tighter than your right.",
     "Error 404: Fortune not found.",
+    "Fortune not found? Abort, Retry, Ignore.",
     "You will trip over an invisible obstacle.",
     "A cloud will look like a dinosaur today.",
     "You will have a conversation with a houseplant.",
@@ -46,7 +64,12 @@ FORTUNES = [
     "A cat will stare at you with judgment.",
     "You will have a dream about cheese.",
     "You will be serenaded by a bird today.",
-    "You will have a craving for something unusual.",    
+    "You will have a craving for something unusual.",
+    "Actions speak louder than fortune cookies.",
+    "Its amazing how much good you can do if you dont care who gets the credit.",
+    "You will conquer obstacles to achieve success.",
+    "The fortune you seek is in another cookie.",
+    "Hard work pays off in the future, laziness pays off now.",
     #Snarky fortunes
     "What do I look like, a fortune teller!",
     "Your shampoo dosent always like your concerts.",
@@ -56,10 +79,13 @@ FORTUNES = [
     "Never trust a fortune cookie.",
     "Never bite the hand that fingers you.",
     "The Moon is in pisces I think, so that probably means you're lucky or something."
+    "You learn from your mistakes... You will learn a lot today.",
     "tell me why, aint nothing but a heart ache- wtf!? im showering is privacy too much to ask?"
     "you know the rules and so do I!",
     "https://www.youtube.com/watch?v=dQw4w9WgXcQ", #Rickroll link
     "You will be Rickrolled today.",
+    "Good news! You're the protaginist in your life story. Bad news: it's a Seinfeld episode.",
+    "Success is around the corner, but remember, but so is failure, waiting with a warm smile.",
     ]
 
 # Tracks (user_id, date) -> count
