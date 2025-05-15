@@ -1,6 +1,7 @@
 import re
 import functools
 import discord
+from decimal import Decimal
 
 
 def is_numeric(value: str) -> bool:
@@ -19,6 +20,8 @@ def format_number(n, precision=4) -> str:
         return str(int(n))
     if isinstance(n, int):
         return str(n)
+    if isinstance(n, (float, Decimal)):
+        return f"{Decimal(n).quantize(Decimal(f'1.{'0'*precision}'))}".rstrip('0').rstrip('.')
     return f"{n:.{precision}g}"
 
 
