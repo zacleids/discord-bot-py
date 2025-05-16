@@ -1,5 +1,5 @@
 import pytest
-from dice import dice_roll_command, roll_dice
+from dice import dice_roll_command, roll_dice, random_command
 from errors import InvalidInputError
 
 def test_dice_roll_command_single_roll():
@@ -37,3 +37,47 @@ def test_dice_roll_command_result_range():
 def test_dice_roll_command_constant():
     result = dice_roll_command(["5"])
     assert result == "5"
+
+def test_random_command_int_range():
+    for _ in range(10):
+        result = int(random_command(["1", "5"]))
+        assert 1 <= result <= 5
+        assert isinstance(result, int)
+    for _ in range(10):
+        result = int(random_command(["-8", "0"]))
+        assert -8 <= result <= 0
+        assert isinstance(result, int)
+    for _ in range(10):
+        result = int(random_command(["5", "1"]))
+        assert 1 <= result <= 5
+        assert isinstance(result, int)
+
+def test_random_command_float_range():
+    for _ in range(10):
+        result = float(random_command(["1.5", "5.5"]))
+        assert 1.5 <= result <= 5.5
+        assert isinstance(result, float)
+    for _ in range(10):
+        result = float(random_command(["5.5", "1.5"]))
+        assert 1.5 <= result <= 5.5
+        assert isinstance(result, float)
+
+def test_random_command_int_and_float():
+    for _ in range(10):
+        result = float(random_command(["2", "5.5"]))
+        assert 2 <= result <= 5.5
+        assert isinstance(result, float)
+    for _ in range(10):
+        result = float(random_command(["5.5", "2"]))
+        assert 2 <= result <= 5.5
+        assert isinstance(result, float)
+
+def test_random_command_invalid_args():
+    with pytest.raises(InvalidInputError):
+        random_command(["a", "5"])  # non-numeric
+    with pytest.raises(InvalidInputError):
+        random_command(["1"])        # too few args
+    with pytest.raises(InvalidInputError):
+        random_command(["1", "2", "3"])  # too many args
+    with pytest.raises(InvalidInputError):
+        random_command(["1.2.3", "4"])  # badly formatted float
