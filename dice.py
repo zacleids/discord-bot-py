@@ -88,3 +88,25 @@ def roll_dice(dice: str, negative_modifier: bool) -> list[int]:
             roll = roll * -1
         rolls.append(roll)
     return rolls
+
+
+def random_command(args: list[str]) -> str:
+    if len(args) != 2:
+        raise InvalidInputError("Invalid input. Please use random <min> <max>")
+
+    try:
+        min_val = float(args[0])
+        max_val = float(args[1])
+    except ValueError:
+        raise InvalidInputError("Both arguments must be numbers.")
+
+    lower = min(min_val, max_val)
+    upper = max(min_val, max_val)
+
+    # Check if both are integers (including negative numbers)
+    if float(lower).is_integer() and float(upper).is_integer():
+        result = random.randint(int(lower), int(upper))
+        return str(result)
+    else:
+        result = random.uniform(lower, upper)
+        return str(result)

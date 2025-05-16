@@ -156,6 +156,8 @@ async def on_message(message: discord.Message):
                 result = conversion.handle_conversion_command(args)
             case "currency":
                 result = currency.handle_currency_command(args)
+            case "rand" | "random":
+                result = dice.random_command(args)
             case _:
                 result = "Command not recognized."
         if files:
@@ -211,6 +213,13 @@ async def eightball_slash_command(interaction: discord.Interaction, message: str
 async def roll_slash_command(interaction: discord.Interaction, dice_roll: str):
     result = dice.dice_roll_command(dice_roll.split(" "))
     await interaction.response.send_message(dice_roll + "\n" + result)
+
+
+@tree.command(name="random", description="generate a random number")
+@log_interaction
+async def roll_slash_command(interaction: discord.Interaction, number1: float, number2: float):
+    result = dice.random_command([str(number1),  str(number2)])
+    await interaction.response.send_message(result)
 
 
 @tree.command(name="rps", description="Play Rock, Paper, Scissors")
