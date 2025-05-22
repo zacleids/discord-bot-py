@@ -1,17 +1,10 @@
 import os
-from peewee import SqliteDatabase
 from config import Config
 
-config = Config()
-orm_db = SqliteDatabase(config.db_orm_path)
-
-from currency import CurrencyRate
-import time_funcs
+from models import orm_db, CurrencyRate, DailyChecklist, DailyChecklistCheck, HangmanGame, Reminder, WorldClock
 import todo
-from hangman import HangmanGame, orm_db
-from reminder import Reminder
-from time_funcs import WorldClock
-from daily_checklist import DailyChecklist, DailyChecklistCheck
+
+config = Config()
 
 
 def create_dbs():
@@ -24,5 +17,6 @@ def create_dbs():
     else:
         print("DB already exists")
 
+    print(f"Connecting to DB: {config.db_orm_path}")
     orm_db.connect()
     orm_db.create_tables([HangmanGame, Reminder, WorldClock, DailyChecklist, DailyChecklistCheck, CurrencyRate])

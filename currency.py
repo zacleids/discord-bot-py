@@ -1,46 +1,33 @@
 from enum import Enum
+import pytz
 import requests
 import datetime
-from db.db import orm_db
+from models import CurrencyRate, orm_db
 from utils import format_number
 
-from peewee import Model, CharField, DateTimeField, TextField
 import datetime
 import json
 
 def utcnow():
     return datetime.datetime.now(datetime.timezone.utc)
 
-class CurrencyRate(Model):
-    base = CharField()
-    rates_json = TextField()  # Store rates as JSON string
-    last_updated = DateTimeField(default=utcnow)
+# Add property methods to CurrencyRate for JSON and datetime handling
 
-    class Meta:
-        database = orm_db
+def _get_rates(self):
+    return json.loads(self.rates_json)
 
-    @property
-    def rates(self) -> dict:
-        """Convert the JSON string to a dictionary."""
-        return json.loads(self.rates_json)
+def _set_rates(self, value):
+    self.rates_json = json.dumps(value)
 
-    @rates.setter
-    def rates(self, value) -> None:
-        """Convert the dictionary to a JSON string."""
-        self.rates_json = json.dumps(value)
+@property
+def rates(self):
+    return _get_rates(self)
 
-    @property
-    def last_updated_dt(self) -> datetime.datetime:
-        """Convert the last_updated field to a datetime object."""
-        val = self.last_updated
-        if isinstance(val, datetime.datetime):
-            return val
-        if isinstance(val, str):
-            try:
-                return datetime.datetime.fromisoformat(val)
-            except Exception:
-                return datetime.datetime.strptime(val, "%Y-%m-%d %H:%M:%S")
-        return val
+@rates.setter
+def rates(self, value):
+    _set_rates(self, value)
+
+CurrencyRate.rates = rates
 
 CURRENCY_NAMES = {
     "USD": "US Dollar",
@@ -90,18 +77,21 @@ def fetch_and_store_rates() -> dict:
     rates = data["rates"]
     now = utcnow()
     with orm_db.atomic():
-        CurrencyRate.delete().where(CurrencyRate.base == BASE_CURRENCY).execute()
-        CurrencyRate.create(base=BASE_CURRENCY, rates_json=json.dumps(rates), last_updated=now)
+        CurrencyRate.delete().where(CurrencyRate.base_currency == BASE_CURRENCY).execute()
+        CurrencyRate.create(base_currency=BASE_CURRENCY, rates_json=json.dumps(rates), last_updated=now)
     return rates
 
 def get_rates() -> dict:
     """Get the latest exchange rates from the database or fetch them if outdated."""
-    rate = CurrencyRate.select().where(CurrencyRate.base == BASE_CURRENCY).first()
+    rate = CurrencyRate.select().where(CurrencyRate.base_currency == BASE_CURRENCY).first()
     now = utcnow()
     if not rate:
         return fetch_and_store_rates()
-    last_updated = rate.last_updated_dt
-    if (now - last_updated).total_seconds() > REFRESH_HOURS * 3600:
+    
+    # Make sure the last_updated is using UTC timezone to compare with now
+    last_updated = rate.last_updated
+    last_updated_tzaware = last_updated.replace(tzinfo=pytz.UTC)
+    if (now - last_updated_tzaware).total_seconds() > REFRESH_HOURS * 3600:
         return fetch_and_store_rates()
     return rate.rates
 
