@@ -2,11 +2,9 @@ import os
 import sys
 import pytest
 
-from config import Config
 from db.db import create_dbs
 from models import orm_db
 
-config = Config()
 # Ensure the environment is set to TEST
 if os.environ.get("ENV") != "TEST":
     sys.exit("ERROR: Tests can only be run when ENV=TEST")
