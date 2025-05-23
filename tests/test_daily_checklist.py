@@ -238,3 +238,4 @@ def test_format_checklist_response_all_checked():
     assert response.count("✅") == 4
     assert "congratulations" in response.lower()
     assert "all items" in response.lower()
+    
