@@ -1,18 +1,6 @@
-from peewee import Model, AutoField, IntegerField, TextField, TimestampField, BooleanField
-from datetime import datetime, timedelta
+from datetime import datetime
+from models import orm_db, Reminder
 import discord
-
-from hangman import BaseModel
-
-class Reminder(BaseModel):
-    id = IntegerField(primary_key=True)
-    user_id = IntegerField()
-    guild_id = IntegerField()
-    channel_id = IntegerField()
-    message = TextField()
-    is_private = BooleanField(default=False)
-    remind_at = TimestampField()
-    created_at = TimestampField(default=datetime.now)
 
 class EditReminderModal(discord.ui.Modal, title="Edit Reminder"):
     def __init__(self, reminder_id: int, existing_message: str, remind_at: datetime):

@@ -5,34 +5,17 @@ import discord
 from pytz import timezone, all_timezones
 
 from errors import InvalidInputError
-from peewee import Model, CharField, IntegerField, DateTimeField, SQL
-from db.db import orm_db
+from models import orm_db, WorldClock
 
 all_timezones_lower = list(map(str.lower, all_timezones))
 
 DB_NAME = "db/bot.db"
-
-
-class WorldClock(Model):
-    guild_id = IntegerField()
-    timezone_str = CharField()
-    label = CharField(null=True)
-    created_at = DateTimeField(constraints=[SQL('DEFAULT CURRENT_TIMESTAMP')])
-
-    class Meta:
-        database = orm_db
-
-    def format(self) -> str:
-        label = self.label + " | " if self.label else ""
-        zone = self.timezone_str
-        return f"{label}{zone}: **{format_time(datetime.now(ZoneInfo(zone)))}**"
 
 def get_timezone(guild_id: int, timezone_str: str) -> WorldClock:
     try:
         return WorldClock.get(WorldClock.guild_id == guild_id, WorldClock.timezone_str == timezone_str)
     except WorldClock.DoesNotExist:
         return None
-
 
 def add_timezone(guild_id: int, timezone_str: str, label=None) -> str:
     if WorldClock.select().where(WorldClock.guild_id == guild_id, WorldClock.timezone_str == timezone_str).exists():
