@@ -6,8 +6,10 @@ def setup_function():
     # Clear WorldClock table before each test
     WorldClock.delete().execute()
 
+GUILD_ID = 1
+
 def test_add_timezone():
-    guild_id = 1
+    guild_id=GUILD_ID
     tz = "America/Denver"
     msg = add_timezone(guild_id, tz)
     assert "added" in msg.lower()
@@ -16,7 +18,7 @@ def test_add_timezone():
     assert any(t.timezone_str == tz for t in tzs)
 
 def test_remove_timezone():
-    guild_id = 2
+    guild_id=GUILD_ID
     tz = "America/Chicago"
     add_timezone(guild_id, tz)
     msg = remove_timezone(guild_id, tz)
@@ -26,7 +28,7 @@ def test_remove_timezone():
     assert all(t.timezone_str != tz for t in tzs)
 
 def test_update_timezone_label():
-    guild_id = 3
+    guild_id=GUILD_ID
     tz = "America/New_York"
     add_timezone(guild_id, tz)
     update_timezone(guild_id, tz, label="NYC")
@@ -34,7 +36,7 @@ def test_update_timezone_label():
     assert tzs[0].label == "NYC"
 
 def test_list_timezones():
-    guild_id = 4
+    guild_id=GUILD_ID
     tz1 = "America/Los_Angeles"
     tz2 = "Europe/London"
     add_timezone(guild_id, tz1)
@@ -52,7 +54,7 @@ def test_get_valid_timezone():
     assert tz2 == "Europe/London"
 
 def test_add_duplicate_timezone():
-    guild_id = 1
+    guild_id=GUILD_ID
     tz = "America/Los_Angeles"
     msg1 = add_timezone(guild_id, tz)
     msg2 = add_timezone(guild_id, tz)
@@ -60,13 +62,13 @@ def test_add_duplicate_timezone():
     assert "already exists" in msg2.lower()
 
 def test_remove_nonexistent_timezone():
-    guild_id = 2
+    guild_id=GUILD_ID
     tz = "America/New_York"
     msg = remove_timezone(guild_id, tz)
     assert "not found" in msg.lower()
 
 def test_case_insensitive_timezone_add_remove():
-    guild_id = 3
+    guild_id=GUILD_ID
     tz = "America/Los_Angeles"
     tz_lower = "america/los_angeles"
     msg1 = add_timezone(guild_id, tz)
@@ -77,18 +79,17 @@ def test_case_insensitive_timezone_add_remove():
     assert "removed" in msg2.lower()
 
 def test_invalid_timezone():
-    guild_id = 4
     with pytest.raises(InvalidInputError):
-        get_valid_timezone("Not/AZone")
+        get_valid_timezone("fake/timezone")
 
 
 def test_list_timezones_empty():
-    guild_id = 5
+    guild_id=GUILD_ID
     tzs = list_timezones(guild_id)
     assert tzs == []
 
 def test_update_label_nonexistent_timezone():
-    guild_id = 6
+    guild_id=GUILD_ID
     tz = "America/Chicago"
     # Should not throw
     update_timezone(guild_id, tz, label="Central")
@@ -96,7 +97,7 @@ def test_update_label_nonexistent_timezone():
     assert list_timezones(guild_id) == []
 
 def test_add_timezone_with_label_response():
-    guild_id = 21
+    guild_id=GUILD_ID
     tz = "Asia/Tokyo"
     label = "Japan Time"
     msg = add_timezone(guild_id, tz, label=label)
@@ -116,7 +117,3 @@ def test_get_valid_timezone_canonical():
 def test_get_valid_timezone_lowercase():
     tz = get_valid_timezone("europe/london")
     assert tz == "Europe/London"
-
-def test_get_valid_timezone_invalid():
-    with pytest.raises(InvalidInputError):
-        get_valid_timezone("fake/timezone")
