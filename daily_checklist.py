@@ -1,27 +1,8 @@
 import datetime
 import pytz
-from peewee import Model, IntegerField, CharField, DateField, SQL, DateTimeField, ForeignKeyField
-from db.db import orm_db
+from models import orm_db, DailyChecklist, DailyChecklistCheck
 from typing import Tuple, List
 import discord
-
-class DailyChecklist(Model):
-    user_id = IntegerField()
-    item = CharField()
-    sort_order = IntegerField(constraints=[SQL('DEFAULT 0')])
-    deleted_at = DateTimeField(null=True)  # For soft deletes
-    created_at = DateTimeField(default=datetime.datetime.now)  # Add created_at field
-    class Meta:
-        database = orm_db
-
-class DailyChecklistCheck(Model):
-    checklist_item = ForeignKeyField(DailyChecklist, backref='checks')
-    checked_at = DateField()  # Stores the day this was checked (in PT)
-    class Meta:
-        database = orm_db
-        indexes = (
-            (('checklist_item', 'checked_at'), True),  # Unique together
-        )
 
 def get_current_day() -> datetime.date:
     tz = pytz.timezone("America/Los_Angeles")
