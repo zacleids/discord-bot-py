@@ -1,5 +1,5 @@
 import pytest
-from time_funcs import add_timezone, remove_timezone, list_timezones, get_valid_timezone, update_timezone, InvalidInputError, WorldClock, format_time
+from time_funcs import add_timezone, format_tzs_response_str, remove_timezone, list_timezones, get_valid_timezone, update_timezone, InvalidInputError, WorldClock, format_time
 
 @pytest.fixture(autouse=True)
 def setup_function():
@@ -104,12 +104,6 @@ def test_add_timezone_with_label_response():
     assert "added" in msg.lower()
     assert f"with label {label}" in msg
 
-def test_format_time_output():
-    from datetime import datetime
-    dt = datetime(2024, 2, 15, 0, 22)  # Thursday February 15 12:22 AM
-    formatted = format_time(dt)
-    assert formatted == "Thursday February 15 12:22 AM"
-
 def test_get_valid_timezone_canonical():
     tz = get_valid_timezone("Europe/London")
     assert tz == "Europe/London"
@@ -117,3 +111,37 @@ def test_get_valid_timezone_canonical():
 def test_get_valid_timezone_lowercase():
     tz = get_valid_timezone("europe/london")
     assert tz == "Europe/London"
+
+def test_worldclock_format():
+    # Create a WorldClock instance (not saved to DB)
+    wc = WorldClock(guild_id=GUILD_ID, timezone_str="Asia/Tokyo", label="Japan Time")
+    formatted = wc.format()
+    # Should include the label and timezone
+    assert "Japan Time" in formatted
+    assert "Asia/Tokyo" in formatted
+
+def test_format_time_output_variants():
+    from datetime import datetime
+    dt = datetime(2024, 2, 15, 0, 22)  # Thursday February 15 12:22 AM
+    formatted = format_time(dt)
+    assert formatted == "Thursday February 15 12:22 AM"
+    dt2 = datetime(2024, 12, 25, 18, 5)  # Wednesday December 25 06:05 PM
+    formatted2 = format_time(dt2)
+    assert formatted2 == "Wednesday December 25 06:05 PM"
+
+def test_format_tzs_response_str():
+    # Create a list of WorldClock objects
+    tzs = [
+        WorldClock(guild_id=GUILD_ID, timezone_str="Asia/Tokyo", label="Japan Time"),
+        WorldClock(guild_id=GUILD_ID, timezone_str="Europe/London", label="London"),
+        WorldClock(guild_id=GUILD_ID, timezone_str="US/Pacific", label="PST")
+    ]
+    # Assume format_tzs_response_str returns a string listing all timezones
+    response = format_tzs_response_str(tzs)
+    assert "Japan Time" in response
+    assert "Asia/Tokyo" in response
+    assert "London" in response
+    assert "Europe/London" in response
+    assert "PST" in response
+    assert "US/Pacific" in response
+
