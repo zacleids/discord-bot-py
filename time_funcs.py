@@ -117,3 +117,11 @@ class EditTimezoneLabelModal(discord.ui.Modal, title="Edit Timezone Label"):
         new_label = self.task_input.value
         update_timezone(self.guild_id, self.timezone_str, new_label)
         await interaction.response.send_message(f"Label updated successfully!")
+
+
+def format(wc: WorldClock) -> str:
+    label = wc.label + " | " if wc.label else ""
+    zone = wc.timezone_str
+    return f"{label}{zone}: **{format_time(datetime.now(ZoneInfo(zone)))}**"
+
+WorldClock.format = format
