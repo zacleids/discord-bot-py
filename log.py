@@ -96,7 +96,7 @@ def log_and_send_message_command(message, content=None, *, files=None, exec_time
     }
     log_event("OUTGOING_COMMAND", log_context)
     # Performance warning for slow message commands
-    if exec_time is not None and exec_time > 1.0:
+    if exec_time is not None and exec_time > config.performance_warning_threshold:
         log_event("PERFORMANCE_WARNING", {
             "ray_id": ray_id,
             "event": "PERFORMANCE_WARNING",
@@ -213,7 +213,7 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
                 "exec_time": exec_time
             })
             # Performance warning for slow slash commands
-            if exec_time > 1.0:
+            if exec_time > config.performance_warning_threshold:
                 log_event("PERFORMANCE_WARNING", {
                     "ray_id": ray_id,
                     "event": "PERFORMANCE_WARNING",
@@ -224,5 +224,3 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
                 }, level="warning")
     wrapper.__signature__ = inspect.signature(func)
     return wrapper
-
-PERFORMANCE_WARNING_THRESHOLD = 1.0  # seconds, can be moved to config if desired

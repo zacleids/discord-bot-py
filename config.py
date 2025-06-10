@@ -36,3 +36,10 @@ class Config:
 
         # Logging configuration
         self.log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+
+    @property
+    def performance_warning_threshold(self):
+        try:
+            return float(os.environ.get("PERFORMANCE_WARNING_THRESHOLD", 1.0))
+        except Exception:
+            return 1.0
