@@ -33,3 +33,6 @@ class Config:
         self.db_orm_name = f"{db_prefix}_orm.db"
         self.db_path = os.path.join(os.path.dirname(__file__), "db", self.db_name)
         self.db_orm_path = os.path.join(os.path.dirname(__file__), "db", self.db_orm_name)
+
+        # Logging configuration
+        self.log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
