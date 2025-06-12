@@ -4,6 +4,7 @@ from typing import Optional
 import discord
 
 from errors import InvalidInputError
+from log import log_event, get_ray_id
 
 DB_NAME = "db/bot.db"
 
@@ -50,6 +51,21 @@ def add_task(user_id: int, task: str, position: int = None):
 
 
 def remove_task(user_id: int, position: int) -> str:
+    tasks = list_tasks(user_id)
+    task = tasks[position-1] if tasks and position <= len(tasks) else None
+    if task:
+        log_event("AUDIT_LOG", {
+            "event": "AUDIT_LOG",
+            "action": "todo_remove",
+            "user_id": user_id,
+            "task_id": getattr(task, 'id', None),
+            "before": {
+                "task": getattr(task, 'task', str(task)),
+                "position": position
+            },
+            "ray_id": get_ray_id()
+        }, level="info")
+
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
 
@@ -86,7 +102,22 @@ def get_task(user_id: int, position: int) -> str:
     return task[0] if task else None
 
 
-def update_task(user_id: int, position: int, new_task: str):
+def update_task(user_id: int, position: int, new_task: str) -> None:
+    tasks = list_tasks(user_id)
+    task = tasks[position-1] if tasks and position <= len(tasks) else None
+    if task:
+        old_task_val = getattr(task, 'task', str(task))
+        log_event("AUDIT_LOG", {
+            "event": "AUDIT_LOG",
+            "action": "todo_edit",
+            "user_id": user_id,
+            "task_id": getattr(task, 'id', None),
+            "before": {"task": old_task_val},
+            "after": {"task": new_task},
+            "position": position,
+            "ray_id": get_ray_id()
+        }, level="info")
+
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
 
@@ -113,6 +144,20 @@ def list_tasks(user_id: int):
 
 
 def move_task(user_id: int, old_position: int, new_position: int) -> str:
+    tasks = list_tasks(user_id)
+    task = tasks[old_position-1] if tasks and old_position <= len(tasks) else None
+    if task:
+        from log import log_event, get_ray_id
+        log_event("AUDIT_LOG", {
+            "event": "AUDIT_LOG",
+            "action": "todo_move",
+            "user_id": user_id,
+            "task_id": getattr(task, 'id', None),
+            "before": {"position": old_position},
+            "after": {"position": new_position},
+            "ray_id": get_ray_id()
+        }, level="info")
+
     if old_position == new_position:
         return "Task is already in that position."
 

@@ -1,5 +1,6 @@
 from datetime import datetime
-from models import orm_db, Reminder
+from log import log_event, get_ray_id
+from models import Reminder
 import discord
 
 class EditReminderModal(discord.ui.Modal, title="Edit Reminder"):
@@ -28,6 +29,22 @@ class EditReminderModal(discord.ui.Modal, title="Edit Reminder"):
         new_remind_at = datetime.strptime(self.remind_at_input.value, "%Y-%m-%d %H:%M:%S")
 
         reminder_instance = Reminder.get_by_id(self.reminder_id)
+        # AUDIT LOG: Log before/after edit
+        log_event("AUDIT_LOG", {
+            "event": "AUDIT_LOG",
+            "action": "reminder_edit",
+            "user_id": interaction.user.id,
+            "reminder_id": reminder_instance.id,
+            "before": {
+                "message": reminder_instance.message,
+                "remind_at": str(reminder_instance.remind_at)
+            },
+            "after": {
+                "message": new_message,
+                "remind_at": str(new_remind_at)
+            },
+            "ray_id": get_ray_id()
+        }, level="info")
         reminder_instance.message = new_message
         reminder_instance.remind_at = new_remind_at
         reminder_instance.save()

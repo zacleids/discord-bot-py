@@ -636,6 +636,19 @@ async def reminder_remove_slash_command(interaction: discord.Interaction, remind
     reminder_instance = Reminder.get_or_none(Reminder.user_id == user.id, Reminder.message == reminder)
 
     if reminder_instance:
+        log_event("AUDIT_LOG", {
+            "event": "AUDIT_LOG",
+            "action": "reminder_delete",
+            "user_id": user.id,
+            "reminder_id": reminder_instance.id,
+            "before": {
+                "message": reminder_instance.message,
+                "remind_at": str(reminder_instance.remind_at),
+                "channel_id": reminder_instance.channel_id,
+                "guild_id": reminder_instance.guild_id,
+                "is_private": reminder_instance.is_private
+            }
+        }, level="info")
         channel = client.get_channel(reminder_instance.channel_id)
         channel_mention = channel.mention if channel else "Unknown Channel"
         reminder_instance.delete_instance()
