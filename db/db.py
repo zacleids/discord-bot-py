@@ -1,10 +1,8 @@
 import os
-from config import Config
+from config import config
 
 from models import orm_db, CurrencyRate, DailyChecklist, DailyChecklistCheck, HangmanGame, Reminder, WorldClock
 import todo
-
-config = Config()
 
 
 def create_dbs():

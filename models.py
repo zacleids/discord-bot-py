@@ -1,8 +1,6 @@
 from peewee import *
 import datetime
-from config import Config
-
-config = Config()
+from config import config
 
 orm_db = SqliteDatabase(config.db_orm_path)
 

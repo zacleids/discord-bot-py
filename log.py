@@ -7,7 +7,7 @@ import discord
 import inspect
 import uuid
 import contextvars
-from config import Config
+from config import config
 
 # --- JsonFormatter for structured logging ---
 class JsonFormatter(logging.Formatter):
@@ -24,7 +24,6 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_record, ensure_ascii=False)
 
 # --- Logger setup (file + console, JSON if possible) ---
-config = Config()
 logger = logging.getLogger("discord_bot")
 logger.setLevel(getattr(logging, config.log_level, logging.INFO))
 logger.propagate = False  # Prevent propagation to root logger
@@ -59,19 +58,19 @@ async def with_ray_id(func, *args, **kwargs):
     finally:
         ray_id_var.reset(token)
 
-def log_event(event_type, context={}, level="info"):
+def log_event(event_type, context={}, level="INFO"):
     """
     Log an event with a given type and context dict, using structured logging.
     Automatically adds a UTC ISO8601 timestamp.
     """
+    level = level.upper()
     log_data = {"event": event_type, **context}
-    # log_data["timestamp"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    log_data["log_level"] = level.upper()  # Add log_level key at top level
-    if level == "info":
+    log_data["log_level"] = level  # Add log_level key at top level
+    if level == "INFO":
         logger.info(log_data)
-    elif level == "warning":
+    elif level == "WARNING":
         logger.warning(log_data)
-    elif level == "error":
+    elif level == "ERROR":
         logger.error(log_data)
     else:
         logger.debug(log_data)
@@ -102,6 +101,7 @@ def log_and_send_message_command(message, content=None, *, files=None, exec_time
             "event": "PERFORMANCE_WARNING",
             "command_type": "message_command",
             "exec_time": exec_time,
+            "performance_warning_threshold": config.performance_warning_threshold,
             "message_id": getattr(message, "id", None),
             "channel_id": getattr(message.channel, "id", None),
             "guild_id": getattr(message.guild, "id", None) if message.guild else None,
@@ -219,8 +219,12 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
                     "event": "PERFORMANCE_WARNING",
                     "command_type": "slash_command",
                     "exec_time": exec_time,
+                    "performance_warning_threshold": config.performance_warning_threshold,
                     "interaction_id": getattr(interaction, 'id', None) if interaction else None,
                     "function": func.__name__
                 }, level="warning")
     wrapper.__signature__ = inspect.signature(func)
     return wrapper
+
+# After logger setup, flush any buffered config log events
+config.flush_log_buffer()

@@ -30,15 +30,12 @@ import currency
 from errors import InvalidInputError
 from log import log_interaction, log_and_send_message_command, log_and_send_message_interaction, get_ray_id, ray_id_var, log_event
 from reminder import Reminder, EditReminderModal
-from config import Config
+from config import config
 from utils import format_number, guild_only
 import uuid
 import logging
 import signal
 import sys
-
-# Initialize config
-config = Config()
 
 # Create bot instance
 intents = discord.Intents.default()
