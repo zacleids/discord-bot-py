@@ -9,6 +9,7 @@ import re
 import discord
 import discord.ext
 from discord.ext import tasks, commands
+import platform
 import pytz
 from dotenv import load_dotenv
 
@@ -62,26 +63,66 @@ tree.add_command(daily_command_group)
 
 # Ensure the database and tasks table are set up
 db.db.create_dbs()
+log_event("DB_READY", {
+    "event": "DB_READY",
+    "db_path": config.db_path,
+    "db_orm_path": config.db_orm_path,
+    "ray_id": get_ray_id()
+}, level="info")
 
 
 @client.event
 async def on_ready():
     print(f'We have logged in as {client.user}')
-    log_event("BOT_READY", {
-        "event": "BOT_READY",
+    log_event("READY", {
+        "event": "READY",
+        "user": str(client.user),
         "bot_name": client.user.name,
         "bot_id": client.user.id,
-        "bot_discriminator": client.user.discriminator,
-        "bot_user": str(client.user),
+        "guild_count": len(client.guilds),
+        "latency": client.latency,
+        "environment": str(config.environment),
+        "python_version": platform.python_version(),
+        "os": os.name,
+        "platform": platform.platform(),
+        "ray_id": get_ray_id()
     })
-
+    log_event("DISCORD_API_HEALTH_READY", {
+        "event": "DISCORD_API_HEALTH_READY",
+        "latency": client.latency,
+        "guild_count": len(client.guilds),
+        "user_count": len(client.users),
+        "ray_id": get_ray_id()
+    }, level="info")
+    log_event("CONFIG_ENVIRONMENT", {
+        "event": "CONFIG_ENVIRONMENT",
+        "environment": str(config.environment),
+        "log_level": config.log_level,
+        "performance_warning_threshold": config.performance_warning_threshold,
+        "db_path": config.db_path,
+        "db_orm_path": config.db_orm_path,
+        "python_version": platform.python_version(),
+        "os": os.name,
+        "platform": platform.platform(),
+        "ray_id": get_ray_id()
+    }, level="info")
     try:
         log_event("CHECK_REMINDERS_START", level="debug")
         check_reminders.start()
         log_event("CHECK_REMINDERS_LOOP_STARTED", level="debug")
-
     except Exception as e:
         log_event("CHECK_REMINDERS_START_ERROR", {"error": str(e)}, level="error")
+
+
+@client.event
+async def on_connect():
+    log_event("DISCORD_API_HEALTH_CONNECTION", {
+        "event": "DISCORD_API_HEALTH_CONNECTION",
+        "latency": client.latency,
+        "guild_count": len(client.guilds),
+        "user_count": len(client.users),
+        "ray_id": get_ray_id()
+    }, level="info")
 
 
 @client.event
@@ -958,7 +999,38 @@ async def before_check_reminders():
         tb_str = traceback.format_exc()
         log_event("CHECK_REMINDERS_BEFORE_LOOP_ERROR", {"error": str(e), "traceback": tb_str}, level="error")
 
+@tasks.loop(minutes=5)
+async def health_check():
+    import psutil
+    process = psutil.Process(os.getpid())
+    now = datetime.now(timezone.utc)
+    start_time = datetime.fromtimestamp(process.create_time(), tz=timezone.utc)
+    uptime_seconds = int((now - start_time).total_seconds())
+    mem = process.memory_info().rss // (1024 * 1024)
+    log_event("HEALTH_CHECK", {
+        "event": "HEALTH_CHECK",
+        "timestamp": now.isoformat(),
+        "uptime_seconds": uptime_seconds,
+        "memory_mb": mem,
+        "guild_count": len(client.guilds),
+        "user_count": len(client.users),
+        "latency": client.latency,
+        "python_version": platform.python_version(),
+        "os": os.name,
+        "platform": platform.platform(),
+        "ray_id": get_ray_id()
+    }, level="info")
+
+
+# Start health check loop after bot is ready
+@client.event
+async def on_ready_health():
+    if not health_check.is_running():
+        health_check.start()
+
+
 def handle_exit(*args):
+    log_event("SHUTDOWN", {"event": "SHUTDOWN", "ray_id": get_ray_id()}, level="info")
     logging.shutdown()
     sys.exit(0)
 
@@ -966,3 +1038,7 @@ signal.signal(signal.SIGINT, handle_exit)
 signal.signal(signal.SIGTERM, handle_exit)
 
 client.run(config.discord_token)
+
+# At the end of the file, add shutdown log
+import atexit
+atexit.register(lambda: log_event("SHUTDOWN", {"event": "SHUTDOWN", "ray_id": get_ray_id()}))
