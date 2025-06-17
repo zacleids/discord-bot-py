@@ -176,8 +176,15 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
             user_name = interaction.user.name
             user_id = interaction.user.id
             command_path = f"/{interaction.command.qualified_name}" if interaction.command else ""
-            args_str = str(args[1:])
-            kwargs_str = str(kwargs)
+            # Try to serialize args and kwargs as JSON, fallback to str if not possible
+            def try_json(obj):
+                try:
+                    json.dumps(obj, ensure_ascii=False)
+                    return obj
+                except Exception:
+                    return str(obj)
+            args_json = try_json(args[1:])  # Skip the first arg (interaction itself)
+            kwargs_json = try_json(kwargs)
             interaction_id = getattr(interaction, 'id', None)
             locale = getattr(interaction, 'locale', None)
             log_context = {
@@ -191,8 +198,8 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
                 "guild": server_name,
                 "channel": channel_name,
                 "command": command_path,
-                "args": args_str,
-                "kwargs": kwargs_str,
+                "args": args_json,
+                "kwargs": kwargs_json,
                 "locale": locale,
                 "function": func.__name__
             }
