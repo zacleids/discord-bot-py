@@ -1,13 +1,13 @@
 import logging
 import sys
 import json
-from datetime import datetime, timezone
 from typing import Callable, Awaitable, Any
 import discord
 import inspect
 import uuid
 import contextvars
 from config import config
+from logging.handlers import RotatingFileHandler
 
 # --- JsonFormatter for structured logging ---
 class JsonFormatter(logging.Formatter):
@@ -29,9 +29,12 @@ logger.setLevel(getattr(logging, config.log_level, logging.INFO))
 logger.propagate = False  # Prevent propagation to root logger
 formatter = JsonFormatter()
 
-file_handler = logging.FileHandler("bot.log", encoding="utf-8")
+# Use RotatingFileHandler for log rotation (5MB per file, 3 backups)
+file_handler = RotatingFileHandler(
+    "bot.log", maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+)
 file_handler.setFormatter(formatter)
-if not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+if not any(isinstance(h, RotatingFileHandler) for h in logger.handlers):
     logger.addHandler(file_handler)
 
 # Only add a StreamHandler for the console if one does not already exist (excluding FileHandler)
