@@ -1,6 +1,7 @@
 import datetime
 import pytz
 from models import orm_db, DailyChecklist, DailyChecklistCheck
+from log import log_event, get_ray_id
 from typing import Tuple, List
 import discord
 
@@ -31,7 +32,17 @@ def remove_item(user_id: int, position: int) -> Tuple[bool, str]:
             .first())
     if not item:
         return False, "Invalid position."
-    
+    log_event("AUDIT_LOG", {
+        "event": "AUDIT_LOG",
+        "action": "daily_checklist_remove",
+        "user_id": user_id,
+        "item_id": item.id,
+        "before": {
+            "item": item.item,
+            "position": position
+        },
+        "ray_id": get_ray_id()
+    }, level="info")
     # Soft delete the item and set its sort_order to 0
     with orm_db.atomic():
         # First shift down all items after this one
@@ -138,6 +149,17 @@ def edit_item(user_id: int, position: int, new_text: str) -> Tuple[bool, str]:
             .first())
     if not item:
         return False, "Invalid position."
+    old_text = item.item
+    log_event("AUDIT_LOG", {
+        "event": "AUDIT_LOG",
+        "action": "daily_checklist_edit",
+        "user_id": user_id,
+        "item_id": item.id,
+        "before": {"item": old_text},
+        "after": {"item": new_text},
+        "position": position,
+        "ray_id": get_ray_id()
+    }, level="info")
     item.item = new_text
     item.save()
     return True, "Item updated."
@@ -160,7 +182,16 @@ def move_item(user_id: int, old_pos: int, new_pos: int) -> Tuple[bool, str]:
                     .first())
     if not item_to_move:
         return False, "Item not found."
-    
+
+    log_event("AUDIT_LOG", {
+        "event": "AUDIT_LOG",
+        "action": "daily_checklist_move",
+        "user_id": user_id,
+        "item_id": item_to_move.id,
+        "before": {"position": old_pos},
+        "after": {"position": new_pos},
+        "ray_id": get_ray_id()
+    }, level="info")
     with orm_db.atomic():
         if old_pos < new_pos:
             # Moving down: shift items up
@@ -201,7 +232,25 @@ class EditDailyItemModal(discord.ui.Modal, title="Edit Daily Item"):
         self.add_item(self.text_input)
 
     async def on_submit(self, interaction: discord.Interaction):
-        success, msg = edit_item(self.user_id, self.index, self.text_input.value)
+        # Try to get the old value
+        try:
+            items = list_items(self.user_id)
+            old_item = items[self.index-1] if items and self.index <= len(items) else None
+            old_text = old_item.item if old_item else None
+        except Exception:
+            old_text = None
+        new_text = self.text_input.value
+        log_event("AUDIT_LOG", {
+            "event": "AUDIT_LOG",
+            "action": "daily_checklist_edit",
+            "user_id": interaction.user.id,
+            "item_id": getattr(old_item, 'id', None) if old_item else None,
+            "before": {"item": old_text},
+            "after": {"item": new_text},
+            "position": self.index,
+            "ray_id": get_ray_id()
+        }, level="info")
+        success, msg = edit_item(self.user_id, self.index, new_text)
         await interaction.response.send_message(msg, ephemeral=not success)
 
 def format_checklist_response(items: List[Tuple[DailyChecklist, bool]], date: datetime.date) -> str:

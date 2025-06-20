@@ -8,7 +8,8 @@ import re
 
 import discord
 import discord.ext
-from discord.ext import tasks
+from discord.ext import tasks, commands
+import platform
 import pytz
 from dotenv import load_dotenv
 
@@ -28,13 +29,14 @@ import fortune
 import conversion
 import currency
 from errors import InvalidInputError
-from log_interaction import log_interaction
+from log import log_interaction, log_and_send_message_command, log_and_send_message_interaction, get_ray_id, ray_id_var, log_event
 from reminder import Reminder, EditReminderModal
-from config import Config
+from config import config
 from utils import format_number, guild_only
-
-# Initialize config
-config = Config()
+import uuid
+import logging
+import signal
+import sys
 
 # Create bot instance
 intents = discord.Intents.default()
@@ -61,12 +63,66 @@ tree.add_command(daily_command_group)
 
 # Ensure the database and tasks table are set up
 db.db.create_dbs()
+log_event("DB_READY", {
+    "event": "DB_READY",
+    "db_path": config.db_path,
+    "db_orm_path": config.db_orm_path,
+    "ray_id": get_ray_id()
+}, level="info")
 
 
 @client.event
 async def on_ready():
     print(f'We have logged in as {client.user}')
-    check_reminders.start()
+    log_event("READY", {
+        "event": "READY",
+        "user": str(client.user),
+        "bot_name": client.user.name,
+        "bot_id": client.user.id,
+        "guild_count": len(client.guilds),
+        "latency": client.latency,
+        "environment": str(config.environment),
+        "python_version": platform.python_version(),
+        "os": os.name,
+        "platform": platform.platform(),
+        "ray_id": get_ray_id()
+    })
+    log_event("DISCORD_API_HEALTH_READY", {
+        "event": "DISCORD_API_HEALTH_READY",
+        "latency": client.latency,
+        "guild_count": len(client.guilds),
+        "user_count": len(client.users),
+        "ray_id": get_ray_id()
+    }, level="info")
+    log_event("CONFIG_ENVIRONMENT", {
+        "event": "CONFIG_ENVIRONMENT",
+        "environment": str(config.environment),
+        "log_level": config.log_level,
+        "performance_warning_threshold": config.performance_warning_threshold,
+        "db_path": config.db_path,
+        "db_orm_path": config.db_orm_path,
+        "python_version": platform.python_version(),
+        "os": os.name,
+        "platform": platform.platform(),
+        "ray_id": get_ray_id()
+    }, level="info")
+    try:
+        log_event("CHECK_REMINDERS_START", level="debug")
+        check_reminders.start()
+        log_event("CHECK_REMINDERS_LOOP_STARTED", level="debug")
+    except Exception as e:
+        log_event("CHECK_REMINDERS_START_ERROR", {"error": str(e)}, level="error")
+
+
+@client.event
+async def on_connect():
+    log_event("DISCORD_API_HEALTH_CONNECTION", {
+        "event": "DISCORD_API_HEALTH_CONNECTION",
+        "latency": client.latency,
+        "guild_count": len(client.guilds),
+        "user_count": len(client.users),
+        "ray_id": get_ray_id()
+    }, level="info")
 
 
 @client.event
@@ -74,101 +130,180 @@ async def on_message(message: discord.Message):
     if message.author == client.user:
         return  # Ignore the bot's own messages
 
-    message_content = message.content
-
-    if not message_content.startswith(config.command_prefix):
-        return  # Ignore message that don't start with the command prefix
-
-    # Support logging for both DMs and guild messages
-    if message.guild is not None:
-        log_str = f"! command \t\t| Server: {message.guild.name}, Channel: {message.channel.name}, Author: {message.author}, Content: {message.content}"
-    else:
-        log_str = f"! command \t\t| DM from: {message.author}, Content: {message.content}"
-    print(log_str)
-
-    command_body = message_content[len(config.command_prefix):].split(" ")
-    command = command_body[0].lower()
-    args = command_body[1:]
-
+    ray_id = str(uuid.uuid4())
+    token = ray_id_var.set(ray_id)
     try:
-        result = "Uh Oh, something went wrong"
-        files = None
-        match command:
-            case "sync":
-                if message.author.id == config.bot_admin_id:
-                    await message.channel.send("Syncing commands...")
-                    info = await tree.sync()
-                    result = "Commands synced!"
+        message_content = message.content
 
-                    #Send the sync info directly to the admin user
-                    cmd_names = set()
-                    for cmd in info:
-                        added = False
-                        for option in cmd.options:
-                            if option.type.name == discord.AppCommandOptionType.subcommand.name:
-                                cmd_names.add(f"{cmd.name} {option.name}")
-                                added = True
-                        if not added:
-                            cmd_names.add(cmd.name)
+        if not message_content.startswith(config.command_prefix):
+            return  # Ignore message that don't start with the command prefix
 
-                    cmd_names = sorted(cmd_names)
-                    info_message = f"Sync completed. {len(info)} top level commands registered & {len(cmd_names)} total commands registered:\n" + "\n".join(cmd_names)
-                    await message.author.send(info_message)
-                else:
-                    result = "You don't have permission to sync commands."
-            case "hello" | "hi" | "hey":
-                await message.add_reaction("👋")
-                result = "Hello!"
-            case "f":
-                result = await eight_ball.f_in_chat(message)
-            case "gg":
-                result = eight_ball.gg()
-            case "coinflip" | "coin" | "flip" | "coin_flip":
-                result = coin.flip_coin()
-            case "coinflip_n" | "coin_n" | "flip_n" | "coin_flip_n":
-                result = coin.flip_coins(args)
-            case "eight" | "eightball" | "8ball":
-                result = await eight_ball.eight_ball(args, message)
-            case "r" | "roll" | "dice" | "roll_dice":
-                result = dice.dice_roll_command(args)
-            case "rps" | "rock" | "paper" | "scissors":
-                result = rps.play_rock_paper_scissors(args)
-            case "todo":
-                result = todo.handle_todo_command(args, message.author, message.mentions)
-            case "color":
-                result, files = color.handle_color_command(args)
-            case "clock" | "clocks":
-                # Only use message.guild.id if in a guild, else use the user ID
-                # This is to support DMs
-                guild_id = message.guild.id if message.guild else message.author.id
-                result = time_funcs.handle_world_clock_command(args, guild_id)
-            case "encode":
-                result = encode.handle_encode_decode_command(args, "encode")
-            case "decode":
-                result = encode.handle_encode_decode_command(args, "decode")
-            case "transform":
-                result = text_transform.handle_text_transform_command(args)
-            case "daily":
-                result = daily_checklist.handle_daily_checklist_command(args, message.author)
-            case "fortune":
-                result = fortune.get_fortune(message.author.id)
-            case "conversion":
-                result = conversion.handle_conversion_command(args)
-            case "currency":
-                result = currency.handle_currency_command(args)
-            case "rand" | "random":
-                result = dice.random_command(args)
-            case _:
-                result = "Command not recognized."
-        if files:
-            await message.channel.send(result, files=[discord.File(file) for file in files])
-        else:
-            await message.channel.send(result)
+        # Prepare log details
+        user_id = message.author.id
+        guild_id = message.guild.id if message.guild else None
+        channel_id = message.channel.id if hasattr(message.channel, 'id') else None
+        thread_id = message.thread.id if hasattr(message, 'thread') and message.thread else None
+        command_body = message_content[len(config.command_prefix):].split(" ")
+        command = command_body[0].lower()
+        args = command_body[1:]
 
-    except InvalidInputError as e:
-        await message.channel.send(f"Error: {e}")
-    except ValueError as e:
-        await message.channel.send(f"Error: {e}")
+        log_context = {
+            "ray_id": ray_id,
+            "event": "INCOMING_MESSAGE_COMMAND",
+            "message_id": message.id,
+            "channel_id": channel_id,
+            "guild_id": guild_id,
+            "user_id": user_id,
+            "user": str(message.author),
+            "guild": str(message.guild.name) if message.guild else None,
+            "channel": str(message.channel.name) if message.guild else None,
+            "thread": str(message.thread.name) if thread_id else None,
+            "command": f"!{command}",
+            "args": args,
+            "content": message.content
+        }
+        log_event("INCOMING_COMMAND", log_context)
+
+        try:
+            result = "Uh Oh, something went wrong"
+            files = None
+            import time
+            start_time = time.perf_counter()
+            match command:
+                case "sync":
+                    if message.author.id == config.bot_admin_id:
+                        await message.channel.send("Syncing commands...")
+                        try:
+                            info = await tree.sync()
+                            result = "Commands synced!"
+                            # Send the sync info directly to the admin user
+                            cmd_names = set()
+                            for cmd in info:
+                                added = False
+                                for option in cmd.options:
+                                    if option.type.name == discord.AppCommandOptionType.subcommand.name:
+                                        cmd_names.add(f"{cmd.name} {option.name}")
+                                        added = True
+                                if not added:
+                                    cmd_names.add(cmd.name)
+                            cmd_names = sorted(cmd_names)
+                            info_message = f"Sync completed. {len(info)} top level commands registered & {len(cmd_names)} total commands registered:\n" + "\n".join(cmd_names)
+                            await message.author.send(info_message)
+                            log_event("SYNC_SUCCESS", {
+                                "ray_id": ray_id,
+                                "event": "SYNC_SUCCESS",
+                                "user_id": message.author.id,
+                                "user": str(message.author),
+                                "channel_id": channel_id,
+                                "guild_id": guild_id,
+                                "message_id": message.id,
+                                "synced_count": len(info),
+                                "synced_commands": cmd_names
+                            })
+                            log_event("SYNC_ADMIN_INFO_SENT", {
+                                "ray_id": ray_id,
+                                "event": "SYNC_ADMIN_INFO_SENT",
+                                "user_id": message.author.id,
+                                "user": str(message.author),
+                                "admin_info": info_message,
+                                "admin_id": message.author.id
+                            })
+                        except Exception as e:
+                            result = f"Sync failed: {e}"
+                            log_event("SYNC_ERROR", {
+                                "ray_id": ray_id,
+                                "event": "SYNC_ERROR",
+                                "user_id": message.author.id,
+                                "user": str(message.author),
+                                "channel_id": channel_id,
+                                "guild_id": guild_id,
+                                "message_id": message.id,
+                                "error": str(e)
+                            }, level="error")
+                    else:
+                        result = "You don't have permission to sync commands."
+                        log_event("SYNC_NO_PERMISSION", {
+                            "ray_id": ray_id,
+                            "event": "SYNC_NO_PERMISSION",
+                            "user_id": message.author.id,
+                            "user": str(message.author),
+                            "channel_id": channel_id,
+                            "guild_id": guild_id,
+                            "message_id": message.id
+                        }, level="warning")
+                case "hello" | "hi" | "hey":
+                    await message.add_reaction("👋")
+                    result = "Hello!"
+                case "f":
+                    result = await eight_ball.f_in_chat(message)
+                case "gg":
+                    result = eight_ball.gg()
+                case "coinflip" | "coin" | "flip" | "coin_flip":
+                    result = coin.flip_coin()
+                case "coinflip_n" | "coin_n" | "flip_n" | "coin_flip_n":
+                    result = coin.flip_coins(args)
+                case "eight" | "eightball" | "8ball":
+                    result = await eight_ball.eight_ball(args, message)
+                case "r" | "roll" | "dice" | "roll_dice":
+                    result = dice.dice_roll_command(args)
+                case "rps" | "rock" | "paper" | "scissors":
+                    result = rps.play_rock_paper_scissors(args)
+                case "todo":
+                    result = todo.handle_todo_command(args, message.author, message.mentions)
+                case "color":
+                    result, files = color.handle_color_command(args)
+                case "clock" | "clocks":
+                    # Only use message.guild.id if in a guild, else use the user ID
+                    # This is to support DMs
+                    guild_id = message.guild.id if message.guild else message.author.id
+                    result = time_funcs.handle_world_clock_command(args, guild_id)
+                case "encode":
+                    result = encode.handle_encode_decode_command(args, "encode")
+                case "decode":
+                    result = encode.handle_encode_decode_command(args, "decode")
+                case "transform":
+                    result = text_transform.handle_text_transform_command(args)
+                case "daily":
+                    result = daily_checklist.handle_daily_checklist_command(args, message.author)
+                case "fortune":
+                    result = fortune.get_fortune(message.author.id)
+                case "conversion":
+                    result = conversion.handle_conversion_command(args)
+                case "currency":
+                    result = currency.handle_currency_command(args)
+                case "rand" | "random":
+                    result = dice.random_command(args)
+                case _:
+                    result = "Command not recognized."
+            exec_time = time.perf_counter() - start_time
+            if files:
+                await log_and_send_message_command(message, result, files=[discord.File(file) for file in files], exec_time=exec_time)
+            else:
+                await log_and_send_message_command(message, result, exec_time=exec_time)
+        except InvalidInputError as e:
+            exec_time = time.perf_counter() - start_time
+            log_event("MESSAGE_COMMAND_ERROR", {
+                "ray_id": ray_id,
+                "event": "MESSAGE_COMMAND_ERROR",
+                "message_id": message.id,
+                "error_type": "InvalidInputError",
+                "error": str(e),
+                "exec_time": exec_time
+            }, level="error")
+            await log_and_send_message_command(message, f"Error: {e}", exec_time=exec_time)
+        except ValueError as e:
+            exec_time = time.perf_counter() - start_time
+            log_event("MESSAGE_COMMAND_ERROR", {
+                "ray_id": ray_id,
+                "event": "MESSAGE_COMMAND_ERROR",
+                "message_id": message.id,
+                "error_type": "ValueError",
+                "error": str(e),
+                "exec_time": exec_time
+            }, level="error")
+            await log_and_send_message_command(message, f"Error: {e}", exec_time=exec_time)
+    finally:
+        ray_id_var.reset(token)
 
 
 #  https://gist.github.com/Rapptz/c4324f17a80c94776832430007ad40e6
@@ -177,49 +312,49 @@ async def on_message(message: discord.Message):
 @log_interaction
 async def f_slash_command(interaction: discord.Interaction):
     result = await eight_ball.f_in_chat()
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
 @tree.command(name="gg", description="Good Game!")
 @log_interaction
 async def gg_slash_command(interaction: discord.Interaction):
     result = eight_ball.gg()
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
 @tree.command(name="coinflip", description="flip a coin")
 @log_interaction
 async def coinflip_slash_command(interaction: discord.Interaction):
     result = coin.flip_coin()
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
 @tree.command(name="coinflip_n", description="flip N number of coins")
 @log_interaction
 async def coinflip_n_slash_command(interaction: discord.Interaction, number: discord.app_commands.Range[int, 1, 100000]):
     result = coin.flip_coins([str(number)])
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
 @tree.command(name="eightball", description="ask the magic eightball")
 @log_interaction
 async def eightball_slash_command(interaction: discord.Interaction, message: str):
     result = await eight_ball.eight_ball(message.split(" "))
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
-@tree.command(name="roll", description=r"roll some dice {num}d{num} ie. \`1d20\`")
+@tree.command(name="roll", description=r"roll some dice {num}d{num} ie. `1d20`")
 @log_interaction
 async def roll_slash_command(interaction: discord.Interaction, dice_roll: str):
     result = dice.dice_roll_command(dice_roll.split(" "))
-    await interaction.response.send_message(dice_roll + "\n" + result)
+    await log_and_send_message_interaction(interaction, dice_roll + "\n" + result)
 
 
 @tree.command(name="random", description="generate a random number")
 @log_interaction
 async def roll_slash_command(interaction: discord.Interaction, number1: float, number2: float):
     result = dice.random_command([str(number1),  str(number2)])
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
 @tree.command(name="rps", description="Play Rock, Paper, Scissors")
@@ -227,25 +362,22 @@ async def roll_slash_command(interaction: discord.Interaction, number1: float, n
 async def rps_slash_command(interaction: discord.Interaction, player_choice: rps.RPSChoice):
     bot_choice = random.choice(list(rps.RPSChoice))
     result = rps.print_win_str(bot_choice, player_choice)
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
 @tree.command(name="encode", description="Encode a message")
 @log_interaction
 async def encode_slash_command(interaction: discord.Interaction, message: str, encoder: encode.EncoderChoice):
-    # result = encode.encode_decode(message, encoder.value)
     args = [encoder.value] +  message.split(" ")
     result = encode.handle_encode_decode_command(args, "encode")
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 @tree.command(name="decode", description="Decode a message")
 @log_interaction
 async def decode_slash_command(interaction: discord.Interaction, message: str, encoder: encode.EncoderChoiceWithoutAll):
-    # result = encode.encode_decode(message, encoder.value, operation='decode')
     args = [encoder.value] +  message.split(" ")
     result = encode.handle_encode_decode_command(args, "decode")
-    await interaction.response.send_message(result)
-
+    await log_and_send_message_interaction(interaction, result)
 
 @tree.command(name="color", description="generate an image of a given color or random color if supplied with 'random'")
 @log_interaction
@@ -259,22 +391,19 @@ async def color_slash_command(interaction: discord.Interaction, color_str: str =
     if include_inverted:
         color_str.append("include_inverted:true")
     result, files = color.handle_color_command(color_str)
-    await interaction.response.send_message(result, files=[discord.File(file) for file in files])
-
+    await log_and_send_message_interaction(interaction, result, files=[discord.File(file) for file in files])
 
 @tree.command(name="transform", description="Transform text in various ways")
 @log_interaction
 async def transform_slash_command(interaction: discord.Interaction, text: str, transform_type: text_transform.TransformChoice):
     result = text_transform.transform_text(text, transform_type)
-    await interaction.response.send_message(result)
-
+    await log_and_send_message_interaction(interaction, result)
 
 @tree.command(name="fortune", description="Get your fortune for today!")
 @log_interaction
 async def fortune_slash_command(interaction: discord.Interaction):
     result = fortune.get_fortune(interaction.user.id)
-    await interaction.response.send_message(result)
-
+    await log_and_send_message_interaction(interaction, result)
 
 @tree.command(name="conversion", description="Convert between units (length, mass, volume)")
 @log_interaction
@@ -289,10 +418,9 @@ async def conversion_slash_command(
         from_enum = conversion.parse_unit(from_unit.value)
         to_enum = conversion.parse_unit(to_unit.value)
         result = conversion.get_conversion_display(from_enum, to_enum, number, height_display=height_display)
-        await interaction.response.send_message(result)
+        await log_and_send_message_interaction(interaction, result)
     except ValueError as e:
-        await interaction.response.send_message(str(e))
-
+        await log_and_send_message_interaction(interaction, str(e))
 
 @tree.command(name="height", description="Convert between feet/inches and centimeters")
 @log_interaction
@@ -305,12 +433,12 @@ async def height_slash_command(
     # If centimeters is provided, do not allow feet or inches
     if centimeters is not None:
         if feet is not None or inches is not None:
-            await interaction.response.send_message("Please provide either centimeters OR feet/inches, not both.")
+            await log_and_send_message_interaction(interaction, "Please provide either centimeters OR feet/inches, not both.")
             return
         from_unit = conversion.UnitType.CENTIMETER
         to_unit = conversion.UnitType.FOOT
         result = conversion.get_conversion_display(from_unit, to_unit, centimeters, height_display=True)
-        await interaction.response.send_message(result)
+        await log_and_send_message_interaction(interaction, result)
         return
     # Otherwise, convert feet/inches to centimeters
     if feet is not None or inches is not None:
@@ -318,9 +446,9 @@ async def height_slash_command(
         from_unit = conversion.UnitType.INCH
         to_unit = conversion.UnitType.CENTIMETER
         result = conversion.get_conversion_display(from_unit, to_unit, total_inches, feet_inches_input=(feet, inches))
-        await interaction.response.send_message(result)
+        await log_and_send_message_interaction(interaction, result)
         return
-    await interaction.response.send_message("Please provide either centimeters or feet (and optionally inches) to convert.", ephemeral=True)
+    await log_and_send_message_interaction(interaction, "Please provide either centimeters or feet (and optionally inches) to convert.", ephemeral=True)
 
 
 # Provide choices for the dropdowns using CURRENCY_NAMES, with contains search
@@ -361,7 +489,7 @@ async def todo_add_slash_command(interaction: discord.Interaction, task: str, po
     user = user or interaction.user  # Default to the interaction user if no mention
     todo.add_task(user.id, task, position)  # Add the task to the database with the user ID
     result = f"Task added: {task}"
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
 # Subcommand `/todo list`
@@ -372,9 +500,9 @@ async def todo_list_slash_command(interaction: discord.Interaction, user: discor
     tasks = todo.list_tasks(user.id)  # Get tasks for the user
     if tasks:
         response = todo.get_tasks_response_str(tasks)
-        await interaction.response.send_message(response)
+        await log_and_send_message_interaction(interaction, response)
     else:
-        await interaction.response.send_message("Your todo list is empty.")
+        await log_and_send_message_interaction(interaction, "Your todo list is empty.")
 
 
 # Subcommand `/todo remove`
@@ -383,7 +511,7 @@ async def todo_list_slash_command(interaction: discord.Interaction, user: discor
 async def todo_remove_slash_command(interaction: discord.Interaction, position: int, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
     response = todo.remove_task(user.id, position)
-    await interaction.response.send_message(response)
+    await log_and_send_message_interaction(interaction, response)
 
 
 # Subcommand `/todo move`
@@ -392,7 +520,7 @@ async def todo_remove_slash_command(interaction: discord.Interaction, position: 
 async def todo_move_slash_command(interaction: discord.Interaction, old_position: int, new_position: int, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
     result = todo.move_task(user.id, old_position, new_position)
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
 # Subcommand `/todo edit`
@@ -404,7 +532,7 @@ async def todo_edit_slash_command(interaction: discord.Interaction, position: in
     existing_task = todo.get_task(user_id, position)
 
     if existing_task is None:
-        await interaction.response.send_message("Task not found.")
+        await log_and_send_message_interaction(interaction, "Task not found.")
         return
 
     # Send the modal
@@ -420,9 +548,9 @@ async def clock_list_slash_command(interaction: discord.Interaction):
     tzs = time_funcs.list_timezones(key_id)
     if tzs:
         response = time_funcs.format_tzs_response_str(tzs)
-        await interaction.response.send_message(response)
+        await log_and_send_message_interaction(interaction, response)
     else:
-        await interaction.response.send_message("There are no clocks in your world clock")
+        await log_and_send_message_interaction(interaction, "There are no clocks in your world clock")
 
 
 async def clock_full_list_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
@@ -444,7 +572,7 @@ async def clock_add_slash_command(interaction: discord.Interaction, timezone: st
     key_id = interaction.guild_id if interaction.guild_id is not None else interaction.user.id
     tz = time_funcs.get_valid_timezone(timezone)
     result = time_funcs.add_timezone(key_id, tz, label)
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
 # Subcommand `/clock remove`
@@ -454,7 +582,7 @@ async def clock_add_slash_command(interaction: discord.Interaction, timezone: st
 async def clock_remove_slash_command(interaction: discord.Interaction, timezone: str):
     key_id = interaction.guild_id if interaction.guild_id is not None else interaction.user.id
     result = time_funcs.remove_timezone(key_id, timezone)
-    await interaction.response.send_message(result)
+    await log_and_send_message_interaction(interaction, result)
 
 
 # Subcommand `/clock edit`
@@ -466,7 +594,7 @@ async def clock_edit_slash_command(interaction: discord.Interaction, timezone: s
     existing_tz = time_funcs.get_timezone(key_id, timezone)
 
     if existing_tz is None:
-        await interaction.response.send_message("Timezone not found.")
+        await log_and_send_message_interaction(interaction, "Timezone not found.")
         return
 
     # Send the modal
@@ -481,18 +609,18 @@ async def hangman_startgame_slash_command(interaction: discord.Interaction, phra
     valid, error_msg = hangman.validate_chars(phrase)
 
     if not valid:
-        await interaction.response.send_message(error_msg, ephemeral=True)
+        await log_and_send_message_interaction(interaction, error_msg, ephemeral=True)
         return
 
     hg = hangman.get_active_hangman_game(interaction.guild_id)
     if hg is not None:
-        await interaction.response.send_message("There is already an active hangman game.")
+        await log_and_send_message_interaction(interaction, "There is already an active hangman game.")
         return
 
     hg = hangman.HangmanGame.create(guild_id=interaction.guild_id, user_id=interaction.user.id, phrase=phrase, num_guesses=num_guesses)
     hg.calculate_board()
     response = hg.print_board()
-    await interaction.response.send_message(response)
+    await log_and_send_message_interaction(interaction, response)
 
 
 # Subcommand `/hangman display`
@@ -502,12 +630,12 @@ async def hangman_startgame_slash_command(interaction: discord.Interaction, phra
 async def hangman_display_slash_command(interaction: discord.Interaction):
     hg = hangman.get_active_hangman_game(interaction.guild_id)
     if hg is None:
-        await interaction.response.send_message("No hangman game active.")
+        await log_and_send_message_interaction(interaction, "No hangman game active.")
         return
 
     response = hg.print_board() + f"\nGame expires {discord.utils.format_dt(hg.created_at + timedelta(hours=8), style='R')}"
 
-    await interaction.response.send_message(response)
+    await log_and_send_message_interaction(interaction, response)
 
 
 # Subcommand `/hangman guess`
@@ -518,17 +646,17 @@ async def hangman_guess_slash_command(interaction: discord.Interaction, guess: s
     valid, error_msg = hangman.validate_chars(guess)
 
     if not valid:
-        await interaction.response.send_message(error_msg, ephemeral=True)
+        await log_and_send_message_interaction(interaction, error_msg, ephemeral=True)
         return
 
     hg = hangman.get_active_hangman_game(interaction.guild_id)
     if hg is None:
-        await interaction.response.send_message("No hangman game active.")
+        await log_and_send_message_interaction(interaction, "No hangman game active.")
         return
 
     hg.guess_new_letters(guess)
     response = hg.print_board()
-    await interaction.response.send_message(response)
+    await log_and_send_message_interaction(interaction, response)
 
 
 async def reminder_existing_list_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
@@ -548,9 +676,9 @@ async def reminder_add_slash_command(interaction: discord.Interaction, message: 
     Reminder.create(user_id=user.id, guild_id=guild_id, channel_id=channel_id, message=message, remind_at=remind_time, is_private=is_private)
 
     if is_private:
-        await interaction.response.send_message(f"Reminder set for {discord.utils.format_dt(remind_time, style='F')}! (Private reminder)", ephemeral=True) # only the creating user can see this
+        await log_and_send_message_interaction(interaction, f"Reminder set for {discord.utils.format_dt(remind_time, style='F')}! (Private reminder)", ephemeral=True) # only the creating user can see this
     else:
-        await interaction.response.send_message(f"Reminder set for {discord.utils.format_dt(remind_time, style='F')}!")
+        await log_and_send_message_interaction(interaction, f"Reminder set for {discord.utils.format_dt(remind_time, style='F')}!")
 
 
 # Subcommand `/reminder list`
@@ -570,7 +698,7 @@ async def reminder_list_slash_command(interaction: discord.Interaction, user: di
     else:
         response += "You have no upcoming public reminders."
 
-    await interaction.response.send_message(response)
+    await log_and_send_message_interaction(interaction, response)
 
     if private_reminders:
         private_response = "**Your upcoming private reminders:**\n"
@@ -588,13 +716,26 @@ async def reminder_remove_slash_command(interaction: discord.Interaction, remind
     reminder_instance = Reminder.get_or_none(Reminder.user_id == user.id, Reminder.message == reminder)
 
     if reminder_instance:
+        log_event("AUDIT_LOG", {
+            "event": "AUDIT_LOG",
+            "action": "reminder_delete",
+            "user_id": user.id,
+            "reminder_id": reminder_instance.id,
+            "before": {
+                "message": reminder_instance.message,
+                "remind_at": str(reminder_instance.remind_at),
+                "channel_id": reminder_instance.channel_id,
+                "guild_id": reminder_instance.guild_id,
+                "is_private": reminder_instance.is_private
+            }
+        }, level="info")
         channel = client.get_channel(reminder_instance.channel_id)
         channel_mention = channel.mention if channel else "Unknown Channel"
         reminder_instance.delete_instance()
         response_message = f"Reminder `{reminder}` in {channel_mention} has been removed."
-        await interaction.response.send_message(response_message, ephemeral=reminder_instance.is_private)
+        await log_and_send_message_interaction(interaction, response_message, ephemeral=reminder_instance.is_private)
     else:
-        await interaction.response.send_message(f"Reminder `{reminder}` not found.", ephemeral=True)
+        await log_and_send_message_interaction(interaction, f"Reminder `{reminder}` not found.", ephemeral=True)
 
 
 # Subcommand `/reminder edit`
@@ -608,7 +749,7 @@ async def reminder_edit_slash_command(interaction: discord.Interaction, reminder
     if reminder_instance:
         await interaction.response.send_modal(EditReminderModal(reminder_instance.id, reminder_instance.message, reminder_instance.remind_at))
     else:
-        await interaction.response.send_message(f"Reminder `{reminder}` not found.", ephemeral=True)
+        await log_and_send_message_interaction(interaction, f"Reminder `{reminder}` not found.", ephemeral=True)
 
 
 # Subcommand `/daily add`
@@ -616,7 +757,7 @@ async def reminder_edit_slash_command(interaction: discord.Interaction, reminder
 @log_interaction
 async def daily_add_slash_command(interaction: discord.Interaction, item: str):
     daily_checklist.add_item(interaction.user.id, item)
-    await interaction.response.send_message(f"Item added: {item}")
+    await log_and_send_message_interaction(interaction, f"Item added: {item}")
 
 
 # Subcommand `/daily remove`
@@ -624,7 +765,7 @@ async def daily_add_slash_command(interaction: discord.Interaction, item: str):
 @log_interaction
 async def daily_remove_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
     success, msg = daily_checklist.remove_item(interaction.user.id, position)
-    await interaction.response.send_message(msg, ephemeral=not success)
+    await log_and_send_message_interaction(interaction, msg, ephemeral=not success)
 
 
 # Subcommand `/daily list`
@@ -634,7 +775,7 @@ async def daily_list_slash_command(interaction: discord.Interaction):
     current_day = daily_checklist.get_current_day()
     items = daily_checklist.get_checklist_for_date(interaction.user.id, current_day)
     response = daily_checklist.format_checklist_response(items, current_day)
-    await interaction.response.send_message(response)
+    await log_and_send_message_interaction(interaction, response)
 
 
 # Subcommand `/daily check`
@@ -642,7 +783,7 @@ async def daily_list_slash_command(interaction: discord.Interaction):
 @log_interaction
 async def daily_check_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
     success, msg = daily_checklist.check_item(interaction.user.id, position)
-    await interaction.response.send_message(msg)
+    await log_and_send_message_interaction(interaction, msg)
 
 
 # Subcommand `/daily uncheck`
@@ -650,7 +791,7 @@ async def daily_check_slash_command(interaction: discord.Interaction, position: 
 @log_interaction
 async def daily_uncheck_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
     success, msg = daily_checklist.uncheck_item(interaction.user.id, position)
-    await interaction.response.send_message(msg)
+    await log_and_send_message_interaction(interaction, msg)
 
 
 # Subcommand `/daily edit`
@@ -659,7 +800,7 @@ async def daily_uncheck_slash_command(interaction: discord.Interaction, position
 async def daily_edit_slash_command(interaction: discord.Interaction, position: discord.app_commands.Range[int, 1, 100]):
     items = daily_checklist.list_items(interaction.user.id)
     if not items or position > len(items):
-        await interaction.response.send_message("Invalid index.", ephemeral=True)
+        await log_and_send_message_interaction(interaction, "Invalid index.", ephemeral=True)
         return
     
     await interaction.response.send_modal(
@@ -678,7 +819,7 @@ async def daily_move_slash_command(interaction: discord.Interaction,
     old_position: discord.app_commands.Range[int, 1, 100],
     new_position: discord.app_commands.Range[int, 1, 100]):
     success, msg = daily_checklist.move_item(interaction.user.id, old_position, new_position)
-    await interaction.response.send_message(msg)
+    await log_and_send_message_interaction(interaction, msg)
 
 
 # Subcommand `/daily history`
@@ -691,19 +832,35 @@ async def daily_history_slash_command(interaction: discord.Interaction, date: st
         else:
             target_date = daily_checklist.get_current_day()
     except ValueError:
-        await interaction.response.send_message("Invalid date format. Please use YYYY-MM-DD", ephemeral=True)
+        await log_and_send_message_interaction(interaction, "Invalid date format. Please use YYYY-MM-DD", ephemeral=True)
         return
 
     items = daily_checklist.get_checklist_for_date(interaction.user.id, target_date)
     response = daily_checklist.format_checklist_response(items, target_date)
-    await interaction.response.send_message(response)
+    await log_and_send_message_interaction(interaction, response)
 
+
+# --- Startup log and debug print ---
+log_event("STARTUP", {"event": "STARTUP", "message": "Bot is starting up and logging is configured."})
 
 # https://fallendeity.github.io/discord.py-masterclass/slash-commands/#error-handling-and-checks
 @tree.error
 async def on_error(interaction: discord.Interaction[discord.Client],
                    error: discord.app_commands.AppCommandError | Exception) -> None:
-    print(error)
+    # Log the error with stack trace
+    import traceback
+    tb_str = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
+    ray_id = get_ray_id() if callable(get_ray_id) else None
+    log_event("SLASH_COMMAND_ERROR", {
+        "ray_id": ray_id,
+        "event": "SLASH_COMMAND_ERROR",
+        "interaction_id": getattr(interaction, "id", None),
+        "command": getattr(interaction.command, "qualified_name", None) if hasattr(interaction, "command") else None,
+        "user_id": getattr(interaction.user, "id", None),
+        "error_type": error.__class__.__name__,
+        "error": str(error),
+        "traceback": tb_str
+    }, level="error")
     if isinstance(error, discord.app_commands.errors.CommandInvokeError):
         error = error.original
     message = f"\nException: {error.__class__.__name__}, Error: {error}, Command: {interaction.command.qualified_name if interaction.command else None}, User: {interaction.user}, Time: {discord.utils.format_dt(interaction.created_at, style='F')}\n"
@@ -719,39 +876,208 @@ async def on_error(interaction: discord.Interaction[discord.Client],
 
 @tasks.loop(seconds=10)
 async def check_reminders():
+    log_event("CHECK_REMINDERS_LOOP_TICK", level="debug")
     now = datetime.now()
     reminders = Reminder.select().where(Reminder.remind_at <= now)
 
     for r in reminders:
         try:
+            delivered = False
             if r.is_private:
                 user = await client.fetch_user(r.user_id)
                 if user:
                     await user.send(f"⏰ Reminder: {r.message}")
+                    delivered = True
+                    log_event(
+                        "REMINDER_DELIVERED",
+                        {
+                            "ray_id": get_ray_id(),
+                            "event": "REMINDER_DELIVERED",
+                            "reminder_id": r.id,
+                            "user_id": r.user_id,
+                            "guild_id": r.guild_id,
+                            "channel_id": None,
+                            "is_private": True,
+                            "message": r.message,
+                            "delivery_type": "dm"
+                        },
+                        level="info"
+                    )
             else:
                 channel = client.get_channel(r.channel_id)
                 if channel:
                     await channel.send(f"⏰ Reminder for <@{r.user_id}>: {r.message}")
+                    delivered = True
+                    log_event(
+                        "REMINDER_DELIVERED",
+                        {
+                            "ray_id": get_ray_id(),
+                            "event": "REMINDER_DELIVERED",
+                            "reminder_id": r.id,
+                            "user_id": r.user_id,
+                            "guild_id": r.guild_id,
+                            "channel_id": r.channel_id,
+                            "is_private": False,
+                            "message": r.message,
+                            "delivery_type": "channel"
+                        },
+                        level="info"
+                    )
                 else:
                     # If channel is None, try sending as DM (for DM reminders)
                     user = await client.fetch_user(r.user_id)
                     if user:
                         await user.send(f"⏰ Reminder: {r.message}")
+                        delivered = True
+                        log_event(
+                            "REMINDER_DELIVERED",
+                            {
+                                "ray_id": get_ray_id(),
+                                "event": "REMINDER_DELIVERED",
+                                "reminder_id": r.id,
+                                "user_id": r.user_id,
+                                "guild_id": r.guild_id,
+                                "channel_id": None,
+                                "is_private": False,
+                                "message": r.message,
+                                "delivery_type": "fallback_dm"
+                            },
+                            level="info"
+                        )
 
             # Delete the reminder after sending it
-            r.delete_instance()
+            if delivered:
+                r.delete_instance()
+                log_event("REMINDER_DELETED",
+                    {
+                        "ray_id": get_ray_id(),
+                        "event": "REMINDER_DELETED",
+                        "reminder_id": r.id,
+                        "user_id": r.user_id,
+                        "guild_id": r.guild_id,
+                        "channel_id": r.channel_id,
+                        "is_private": r.is_private,
+                        "message": r.message,
+                    },
+                    level="debug")
+                          
 
         except discord.NotFound:
-            print(f"User {r.user_id} or Channel {r.channel_id} not found.")
+            log_event(
+                "REMINDER_DELIVERY_ERROR",
+                {
+                    "ray_id": get_ray_id(),
+                    "event": "REMINDER_DELIVERY_ERROR",
+                    "reminder_id": r.id,
+                    "user_id": r.user_id,
+                    "channel_id": r.channel_id,
+                    "error_type": "NotFound",
+                    "error": f"User {r.user_id} or Channel {r.channel_id} not found."
+                },
+                level="error"
+            )
         except discord.Forbidden:
-            print(f"Cannot send message to {r.user_id} or Channel {r.channel_id} (they might have DMs or messages disabled).")
+            log_event(
+                "REMINDER_DELIVERY_ERROR",
+                {
+                    "ray_id": get_ray_id(),
+                    "event": "REMINDER_DELIVERY_ERROR",
+                    "reminder_id": r.id,
+                    "user_id": r.user_id,
+                    "channel_id": r.channel_id,
+                    "error_type": "Forbidden",
+                    "error": f"Cannot send message to {r.user_id} or Channel {r.channel_id} (they might have DMs or messages disabled)."
+                },
+                level="error"
+            )
         except discord.HTTPException as e:
-            print(f"Failed to send reminder to {r.user_id} or Channel {r.channel_id}: {e}")
+            log_event(
+                "REMINDER_DELIVERY_ERROR",
+                {
+                    "ray_id": get_ray_id(),
+                    "event": "REMINDER_DELIVERY_ERROR",
+                    "reminder_id": r.id,
+                    "user_id": r.user_id,
+                    "channel_id": r.channel_id,
+                    "error_type": "HTTPException",
+                    "error": f"Failed to send reminder to {r.user_id} or Channel {r.channel_id}: {e}"
+                },
+                level="error"
+            )
+        except Exception as e:
+            import traceback
+            tb_str = traceback.format_exc()
+            log_event(
+                "REMINDER_DELIVERY_ERROR",
+                {
+                    "ray_id": get_ray_id(),
+                    "event": "REMINDER_DELIVERY_ERROR",
+                    "reminder_id": r.id,
+                    "user_id": r.user_id,
+                    "channel_id": r.channel_id,
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "traceback": tb_str
+                },
+                level="error"
+            )
 
 @check_reminders.before_loop
 async def before_check_reminders():
-    await client.wait_until_ready()
+    log_event("CHECK_REMINDERS_BEFORE_LOOP_START", level="info")
+    try:
+        # Add a timeout to see if this is hanging forever
+        import asyncio
+        try:
+            await asyncio.wait_for(client.wait_until_ready(), timeout=10)
+            log_event("CHECK_REMINDERS_BEFORE_LOOP_DONE", level="info")
+        except asyncio.TimeoutError:
+            log_event("CHECK_REMINDERS_BEFORE_LOOP_TIMEOUT", level="error")
+    except Exception as e:
+        import traceback
+        tb_str = traceback.format_exc()
+        log_event("CHECK_REMINDERS_BEFORE_LOOP_ERROR", {"error": str(e), "traceback": tb_str}, level="error")
 
+@tasks.loop(minutes=5)
+async def health_check():
+    import psutil
+    process = psutil.Process(os.getpid())
+    now = datetime.now(timezone.utc)
+    start_time = datetime.fromtimestamp(process.create_time(), tz=timezone.utc)
+    uptime_seconds = int((now - start_time).total_seconds())
+    mem = process.memory_info().rss // (1024 * 1024)
+    log_event("HEALTH_CHECK", {
+        "event": "HEALTH_CHECK",
+        "timestamp": now.isoformat(),
+        "uptime_seconds": uptime_seconds,
+        "memory_mb": mem,
+        "guild_count": len(client.guilds),
+        "user_count": len(client.users),
+        "latency": client.latency,
+        "python_version": platform.python_version(),
+        "os": os.name,
+        "platform": platform.platform(),
+        "ray_id": get_ray_id()
+    }, level="info")
+
+
+# Start health check loop after bot is ready
+@client.event
+async def on_ready_health():
+    if not health_check.is_running():
+        health_check.start()
+
+
+def handle_exit(*args):
+    log_event("SHUTDOWN", {"event": "SHUTDOWN", "ray_id": get_ray_id()}, level="info")
+    logging.shutdown()
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handle_exit)
+signal.signal(signal.SIGTERM, handle_exit)
 
 client.run(config.discord_token)
 
+# At the end of the file, add shutdown log
+import atexit
+atexit.register(lambda: log_event("SHUTDOWN", {"event": "SHUTDOWN", "ray_id": get_ray_id()}))
