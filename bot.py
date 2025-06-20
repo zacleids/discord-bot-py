@@ -173,25 +173,64 @@ async def on_message(message: discord.Message):
                 case "sync":
                     if message.author.id == config.bot_admin_id:
                         await message.channel.send("Syncing commands...")
-                        info = await tree.sync()
-                        result = "Commands synced!"
-
-                        #Send the sync info directly to the admin user
-                        cmd_names = set()
-                        for cmd in info:
-                            added = False
-                            for option in cmd.options:
-                                if option.type.name == discord.AppCommandOptionType.subcommand.name:
-                                    cmd_names.add(f"{cmd.name} {option.name}")
-                                    added = True
-                            if not added:
-                                cmd_names.add(cmd.name)
-
-                        cmd_names = sorted(cmd_names)
-                        info_message = f"Sync completed. {len(info)} top level commands registered & {len(cmd_names)} total commands registered:\n" + "\n".join(cmd_names)
-                        await message.author.send(info_message)
+                        try:
+                            info = await tree.sync()
+                            result = "Commands synced!"
+                            # Send the sync info directly to the admin user
+                            cmd_names = set()
+                            for cmd in info:
+                                added = False
+                                for option in cmd.options:
+                                    if option.type.name == discord.AppCommandOptionType.subcommand.name:
+                                        cmd_names.add(f"{cmd.name} {option.name}")
+                                        added = True
+                                if not added:
+                                    cmd_names.add(cmd.name)
+                            cmd_names = sorted(cmd_names)
+                            info_message = f"Sync completed. {len(info)} top level commands registered & {len(cmd_names)} total commands registered:\n" + "\n".join(cmd_names)
+                            await message.author.send(info_message)
+                            log_event("SYNC_SUCCESS", {
+                                "ray_id": ray_id,
+                                "event": "SYNC_SUCCESS",
+                                "user_id": message.author.id,
+                                "user": str(message.author),
+                                "channel_id": channel_id,
+                                "guild_id": guild_id,
+                                "message_id": message.id,
+                                "synced_count": len(info),
+                                "synced_commands": cmd_names
+                            })
+                            log_event("SYNC_ADMIN_INFO_SENT", {
+                                "ray_id": ray_id,
+                                "event": "SYNC_ADMIN_INFO_SENT",
+                                "user_id": message.author.id,
+                                "user": str(message.author),
+                                "admin_info": info_message,
+                                "admin_id": message.author.id
+                            })
+                        except Exception as e:
+                            result = f"Sync failed: {e}"
+                            log_event("SYNC_ERROR", {
+                                "ray_id": ray_id,
+                                "event": "SYNC_ERROR",
+                                "user_id": message.author.id,
+                                "user": str(message.author),
+                                "channel_id": channel_id,
+                                "guild_id": guild_id,
+                                "message_id": message.id,
+                                "error": str(e)
+                            }, level="error")
                     else:
                         result = "You don't have permission to sync commands."
+                        log_event("SYNC_NO_PERMISSION", {
+                            "ray_id": ray_id,
+                            "event": "SYNC_NO_PERMISSION",
+                            "user_id": message.author.id,
+                            "user": str(message.author),
+                            "channel_id": channel_id,
+                            "guild_id": guild_id,
+                            "message_id": message.id
+                        }, level="warning")
                 case "hello" | "hi" | "hey":
                     await message.add_reaction("👋")
                     result = "Hello!"
