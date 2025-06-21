@@ -405,22 +405,59 @@ async def fortune_slash_command(interaction: discord.Interaction):
     result = fortune.get_fortune(interaction.user.id)
     await log_and_send_message_interaction(interaction, result)
 
+
+def unit_choices(current = "") -> list[discord.app_commands.Choice[str]]:
+    current_lower = current.lower()
+    return [
+        discord.app_commands.Choice(name=unit.value, value=unit.value)
+        for unit in conversion.UnitTypeChoice
+        if current_lower in unit.value.lower()
+    ][:25]
+
+async def to_unit_list_autocomplete(interaction: discord.Interaction, current: str):
+    # Get the selected from_unit from the interaction options
+    from_unit_value = None
+    for option in interaction.data.get('options', []):
+        if option.get('name') == 'from_unit':
+            from_unit_value = option.get('value')
+            break
+    # If from_unit is not set, return all units as Choices
+    if not from_unit_value:
+        return unit_choices(current)
+    try:
+        from_enum = conversion.parse_unit(from_unit_value)
+        from_category = from_enum.category
+    except Exception:
+        return unit_choices(current)
+    # Only show units in the same category, excluding the from_unit
+    return [
+        discord.app_commands.Choice(name=unit.value, value=unit.value)
+        for unit in conversion.UnitTypeChoice
+        if getattr(conversion.parse_unit(unit.value), 'category', None) == from_category and unit.value != from_unit_value and current.lower() in unit.value.lower()
+    ][:25]
+
 @tree.command(name="conversion", description="Convert between units (length, mass, volume)")
+@discord.app_commands.autocomplete(
+    to_unit=to_unit_list_autocomplete
+)
+@discord.app_commands.choices(from_unit=unit_choices())
 @log_interaction
 async def conversion_slash_command(
     interaction: discord.Interaction,
-    from_unit: conversion.UnitTypeChoice,
-    to_unit: conversion.UnitTypeChoice,
+    from_unit: str,
+    to_unit: str,
     number: float,
     height_display: bool = False
 ):
+    await interaction.response.defer(thinking=True)
     try:
-        from_enum = conversion.parse_unit(from_unit.value)
-        to_enum = conversion.parse_unit(to_unit.value)
+        from_enum = conversion.parse_unit(from_unit)
+        to_enum = conversion.parse_unit(to_unit)
         result = conversion.get_conversion_display(from_enum, to_enum, number, height_display=height_display)
         await log_and_send_message_interaction(interaction, result)
     except ValueError as e:
         await log_and_send_message_interaction(interaction, str(e))
+
 
 @tree.command(name="height", description="Convert between feet/inches and centimeters")
 @log_interaction
