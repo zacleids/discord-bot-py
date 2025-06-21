@@ -35,4 +35,4 @@ jobs:
       env:
         ENV: TEST
       run: |
-        pytest -n auto
+        pytest
