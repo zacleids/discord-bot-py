@@ -372,12 +372,14 @@ async def encode_slash_command(interaction: discord.Interaction, message: str, e
     result = encode.handle_encode_decode_command(args, "encode")
     await log_and_send_message_interaction(interaction, result)
 
+
 @tree.command(name="decode", description="Decode a message")
 @log_interaction
 async def decode_slash_command(interaction: discord.Interaction, message: str, encoder: encode.EncoderChoiceWithoutAll):
     args = [encoder.value] +  message.split(" ")
     result = encode.handle_encode_decode_command(args, "decode")
     await log_and_send_message_interaction(interaction, result)
+
 
 @tree.command(name="color", description="generate an image of a given color or random color if supplied with 'random'")
 @log_interaction
@@ -393,11 +395,13 @@ async def color_slash_command(interaction: discord.Interaction, color_str: str =
     result, files = color.handle_color_command(color_str)
     await log_and_send_message_interaction(interaction, result, files=[discord.File(file) for file in files])
 
+
 @tree.command(name="transform", description="Transform text in various ways")
 @log_interaction
 async def transform_slash_command(interaction: discord.Interaction, text: str, transform_type: text_transform.TransformChoice):
     result = text_transform.transform_text(text, transform_type)
     await log_and_send_message_interaction(interaction, result)
+
 
 @tree.command(name="fortune", description="Get your fortune for today!")
 @log_interaction
@@ -496,6 +500,7 @@ async def currency_list_autocomplete(interaction: discord.Interaction, current: 
         for code in currency.CURRENCY_NAMES
         if current_lower in code.lower() or current_lower in currency.get_currency_name(code).lower()
     ][:25]
+
 
 @tree.command(name="currency", description="Convert between currencies")
 @discord.app_commands.autocomplete(
