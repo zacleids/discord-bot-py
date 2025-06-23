@@ -1,8 +1,8 @@
 import re
+from pathlib import Path
 from random import randrange
 
 from PIL import Image, ImageColor
-from pathlib import Path
 
 from errors import InvalidInputError
 
@@ -10,7 +10,7 @@ Path("temp/").mkdir(parents=True, exist_ok=True)
 # Setting the size of the image
 size = (400, 300)
 
-image_name_start = 'temp/new_image'
+image_name_start = "temp/new_image"
 image_file_type = ".png"
 
 
@@ -27,7 +27,7 @@ def is_valid_hex_code(hex_code: str) -> bool:
 
 def generate_image(color, num=0) -> str:
     # Creating a new image with RGB mode
-    new_image = Image.new('RGB', size, color)
+    new_image = Image.new("RGB", size, color)
 
     image_name = image_name_start + str(num) + image_file_type
     # Save the image
@@ -60,7 +60,7 @@ def handle_color_command(args: list[str]):
                 include_inverted = True
             i += 1
         elif arg.lower() == "include_inverted":
-            if i + 1 < len(args) and args[i+1].lower() == "true":
+            if i + 1 < len(args) and args[i + 1].lower() == "true":
                 include_inverted = True
                 i += 2
             else:
@@ -112,7 +112,7 @@ def handle_color_command(args: list[str]):
                     result = subcommand + " " + formate_rgb_tuple(color_tuple)
                 except ValueError:
                     raise InvalidInputError(f"Invalid color: {subcommand}")
-    
+
     # Add inverted image/hex if flag is set
     if include_inverted:
         if len(files) > 1:
@@ -122,5 +122,5 @@ def handle_color_command(args: list[str]):
             inverse_hex = formate_rgb_tuple(inverse_color)
             result += "\nInverse Hex: " + inverse_hex
             files.append(generate_image(inverse_color, "inverted"))
-    
+
     return result, files

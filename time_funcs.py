@@ -2,20 +2,22 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import discord
-from pytz import timezone, all_timezones
+from pytz import all_timezones
 
 from errors import InvalidInputError
-from models import orm_db, WorldClock
+from models import WorldClock
 
 all_timezones_lower = list(map(str.lower, all_timezones))
 
 DB_NAME = "db/bot.db"
+
 
 def get_timezone(guild_id: int, timezone_str: str) -> WorldClock:
     try:
         return WorldClock.get(WorldClock.guild_id == guild_id, WorldClock.timezone_str == timezone_str)
     except WorldClock.DoesNotExist:
         return None
+
 
 def add_timezone(guild_id: int, timezone_str: str, label=None) -> str:
     if WorldClock.select().where(WorldClock.guild_id == guild_id, WorldClock.timezone_str == timezone_str).exists():
@@ -49,7 +51,7 @@ def format_tzs_response_str(tzs: list[WorldClock]) -> str:
 
     for tz in tzs:
         result += tz.format() + "\n"
-        
+
     return result
 
 
@@ -106,22 +108,19 @@ class EditTimezoneLabelModal(discord.ui.Modal, title="Edit Timezone Label"):
         self.timezone_str = timezone_str
 
         # Prefill the text field with the existing task
-        self.task_input = discord.ui.TextInput(
-            label="Edit label",
-            default=existing_label,
-            style=discord.TextStyle.short
-        )
+        self.task_input = discord.ui.TextInput(label="Edit label", default=existing_label, style=discord.TextStyle.short)
         self.add_item(self.task_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         new_label = self.task_input.value
         update_timezone(self.guild_id, self.timezone_str, new_label)
-        await interaction.response.send_message(f"Label updated successfully!")
+        await interaction.response.send_message("Label updated successfully!")
 
 
 def format(wc: WorldClock) -> str:
     label = wc.label + " | " if wc.label else ""
     zone = wc.timezone_str
     return f"{label}{zone}: **{format_time(datetime.now(ZoneInfo(zone)))}**"
+
 
 WorldClock.format = format

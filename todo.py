@@ -1,10 +1,9 @@
 import sqlite3
-from typing import Optional
 
 import discord
 
 from errors import InvalidInputError
-from log import log_event, get_ray_id
+from log import get_ray_id, log_event
 
 DB_NAME = "db/bot.db"
 
@@ -14,7 +13,8 @@ def create_db():
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
     CREATE TABLE IF NOT EXISTS todo_list (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -22,7 +22,8 @@ def create_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         order_index INTEGER NOT NULL
     )
-    """)
+    """
+    )
     connection.commit()
     connection.close()
 
@@ -40,8 +41,7 @@ def add_task(user_id: int, task: str, position: int = None):
         position = task_count + 1
 
     # Shift all tasks at or below the position down by 1
-    c.execute("UPDATE todo_list SET order_index = order_index + 1 WHERE user_id = ? AND order_index >= ?",
-              (user_id, position))
+    c.execute("UPDATE todo_list SET order_index = order_index + 1 WHERE user_id = ? AND order_index >= ?", (user_id, position))
 
     # Insert the new task at the specified position
     c.execute("INSERT INTO todo_list (user_id, task, order_index) VALUES (?, ?, ?)", (user_id, task, position))
@@ -52,19 +52,20 @@ def add_task(user_id: int, task: str, position: int = None):
 
 def remove_task(user_id: int, position: int) -> str:
     tasks = list_tasks(user_id)
-    task = tasks[position-1] if tasks and position <= len(tasks) else None
+    task = tasks[position - 1] if tasks and position <= len(tasks) else None
     if task:
-        log_event("AUDIT_LOG", {
-            "event": "AUDIT_LOG",
-            "action": "todo_remove",
-            "user_id": user_id,
-            "task_id": getattr(task, 'id', None),
-            "before": {
-                "task": getattr(task, 'task', str(task)),
-                "position": position
+        log_event(
+            "AUDIT_LOG",
+            {
+                "event": "AUDIT_LOG",
+                "action": "todo_remove",
+                "user_id": user_id,
+                "task_id": getattr(task, "id", None),
+                "before": {"task": getattr(task, "task", str(task)), "position": position},
+                "ray_id": get_ray_id(),
             },
-            "ray_id": get_ray_id()
-        }, level="info")
+            level="info",
+        )
 
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
@@ -82,8 +83,7 @@ def remove_task(user_id: int, position: int) -> str:
     cursor.execute("DELETE FROM todo_list WHERE id = ?", (task_id,))
 
     # Shift all tasks above it up by 1
-    cursor.execute("UPDATE todo_list SET order_index = order_index - 1 WHERE user_id = ? AND order_index > ?",
-                   (user_id, position))
+    cursor.execute("UPDATE todo_list SET order_index = order_index - 1 WHERE user_id = ? AND order_index > ?", (user_id, position))
 
     connection.commit()
     connection.close()
@@ -104,19 +104,23 @@ def get_task(user_id: int, position: int) -> str:
 
 def update_task(user_id: int, position: int, new_task: str) -> None:
     tasks = list_tasks(user_id)
-    task = tasks[position-1] if tasks and position <= len(tasks) else None
+    task = tasks[position - 1] if tasks and position <= len(tasks) else None
     if task:
-        old_task_val = getattr(task, 'task', str(task))
-        log_event("AUDIT_LOG", {
-            "event": "AUDIT_LOG",
-            "action": "todo_edit",
-            "user_id": user_id,
-            "task_id": getattr(task, 'id', None),
-            "before": {"task": old_task_val},
-            "after": {"task": new_task},
-            "position": position,
-            "ray_id": get_ray_id()
-        }, level="info")
+        old_task_val = getattr(task, "task", str(task))
+        log_event(
+            "AUDIT_LOG",
+            {
+                "event": "AUDIT_LOG",
+                "action": "todo_edit",
+                "user_id": user_id,
+                "task_id": getattr(task, "id", None),
+                "before": {"task": old_task_val},
+                "after": {"task": new_task},
+                "position": position,
+                "ray_id": get_ray_id(),
+            },
+            level="info",
+        )
 
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
@@ -130,12 +134,15 @@ def list_tasks(user_id: int):
     connection = sqlite3.connect(DB_NAME)
     cursor = connection.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT order_index, task
         FROM todo_list
         WHERE user_id = ?
         ORDER BY order_index ASC
-    """, (user_id,))
+    """,
+        (user_id,),
+    )
 
     tasks = cursor.fetchall()
     connection.close()
@@ -145,18 +152,23 @@ def list_tasks(user_id: int):
 
 def move_task(user_id: int, old_position: int, new_position: int) -> str:
     tasks = list_tasks(user_id)
-    task = tasks[old_position-1] if tasks and old_position <= len(tasks) else None
+    task = tasks[old_position - 1] if tasks and old_position <= len(tasks) else None
     if task:
-        from log import log_event, get_ray_id
-        log_event("AUDIT_LOG", {
-            "event": "AUDIT_LOG",
-            "action": "todo_move",
-            "user_id": user_id,
-            "task_id": getattr(task, 'id', None),
-            "before": {"position": old_position},
-            "after": {"position": new_position},
-            "ray_id": get_ray_id()
-        }, level="info")
+        from log import get_ray_id, log_event
+
+        log_event(
+            "AUDIT_LOG",
+            {
+                "event": "AUDIT_LOG",
+                "action": "todo_move",
+                "user_id": user_id,
+                "task_id": getattr(task, "id", None),
+                "before": {"position": old_position},
+                "after": {"position": new_position},
+                "ray_id": get_ray_id(),
+            },
+            level="info",
+        )
 
     if old_position == new_position:
         return "Task is already in that position."
@@ -173,12 +185,10 @@ def move_task(user_id: int, old_position: int, new_position: int) -> str:
     task_id = task[0]
 
     # Remove gap where the task was
-    c.execute("UPDATE todo_list SET order_index = order_index - 1 WHERE user_id = ? AND order_index > ?",
-              (user_id, old_position))
+    c.execute("UPDATE todo_list SET order_index = order_index - 1 WHERE user_id = ? AND order_index > ?", (user_id, old_position))
 
     # Make space at the new position
-    c.execute("UPDATE todo_list SET order_index = order_index + 1 WHERE user_id = ? AND order_index >= ?",
-              (user_id, new_position))
+    c.execute("UPDATE todo_list SET order_index = order_index + 1 WHERE user_id = ? AND order_index >= ?", (user_id, new_position))
 
     # Move the task
     c.execute("UPDATE todo_list SET order_index = ? WHERE id = ?", (new_position, task_id))
@@ -226,7 +236,7 @@ def handle_todo_command(args: list[str], user: discord.User, mentions: list[disc
 
             case "remove":
                 if mentions:
-                    result = f"Cannot remove task using ! version for another user. please use `/todo remove` and select the user"
+                    result = "Cannot remove task using ! version for another user. please use `/todo remove` and select the user"
                 elif not sub_args or not sub_args[0].isdigit():
                     result = "Please provide the ID of the task to remove."
                 else:
@@ -251,11 +261,7 @@ class EditTaskModal(discord.ui.Modal, title="Edit Task"):
         self.position = position
 
         # Prefill the text field with the existing task
-        self.task_input = discord.ui.TextInput(
-            label="Edit your task",
-            default=existing_task,
-            style=discord.TextStyle.long
-        )
+        self.task_input = discord.ui.TextInput(label="Edit your task", default=existing_task, style=discord.TextStyle.long)
         self.add_item(self.task_input)
 
     async def on_submit(self, interaction: discord.Interaction):

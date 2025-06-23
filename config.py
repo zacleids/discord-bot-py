@@ -1,17 +1,20 @@
 import os
 from enum import Enum
+
 from dotenv import load_dotenv
+
 
 class Environment(Enum):
     PROD = "PROD"
     DEV = "DEV"
     TEST = "TEST"
 
+
 class Config:
     def __init__(self):
         self._log_buffer = []  # Buffer for early config log events
         self.environment = Environment(os.getenv("ENV", "DEV"))
-        
+
         # If running under pytest, override with .env.test
         if "PYTEST_CURRENT_TEST" in os.environ or os.getenv("ENV") == "TEST":
             load_dotenv(".env.test", override=True)
@@ -25,9 +28,9 @@ class Config:
             db_prefix = "test"
 
         # Bot configuration
-        self.discord_token = os.getenv('DISCORD_TOKEN')
-        self.bot_admin_id = int(os.getenv('BOT_ADMIN_ID'))
-        self.command_prefix = os.getenv('COMMAND_PREFIX', "!")
+        self.discord_token = os.getenv("DISCORD_TOKEN")
+        self.bot_admin_id = int(os.getenv("BOT_ADMIN_ID"))
+        self.command_prefix = os.getenv("COMMAND_PREFIX", "!")
 
         # Database configuration
         self.db_name = f"{db_prefix}.db"
@@ -36,7 +39,7 @@ class Config:
         self.db_orm_path = os.path.join(os.path.dirname(__file__), "db", self.db_orm_name)
 
         # Logging configuration
-        self.log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+        self.log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 
         # Configurations for various features
 
@@ -48,6 +51,7 @@ class Config:
     def flush_log_buffer(self):
         try:
             from log import log_event
+
             for event_type, context, level in self._log_buffer:
                 log_event(event_type, context, level)
             self._log_buffer.clear()
@@ -59,19 +63,22 @@ class Config:
         """Load the performance warning threshold from environment variable or default to 1.0."""
         try:
             val = float(os.environ.get("PERFORMANCE_WARNING_THRESHOLD", "1.0"))
-            self._buffer_log_event("CONFIG_LOADED", {
-                "event": "CONFIG_LOADED",
-                "message": "Loaded PERFORMANCE_WARNING_THRESHOLD",
-                "value": val
-            }, "DEBUG")
+            self._buffer_log_event(
+                "CONFIG_LOADED", {"event": "CONFIG_LOADED", "message": "Loaded PERFORMANCE_WARNING_THRESHOLD", "value": val}, "DEBUG"
+            )
             return val
         except Exception:
-            self._buffer_log_event("CONFIG_ERROR", {
-                "event": "CONFIG_ERROR",
-                "message": "Invalid PERFORMANCE_WARNING_THRESHOLD, defaulting to 1.0",
-                "value": os.environ.get("PERFORMANCE_WARNING_THRESHOLD")
-            }, "WARNING")
+            self._buffer_log_event(
+                "CONFIG_ERROR",
+                {
+                    "event": "CONFIG_ERROR",
+                    "message": "Invalid PERFORMANCE_WARNING_THRESHOLD, defaulting to 1.0",
+                    "value": os.environ.get("PERFORMANCE_WARNING_THRESHOLD"),
+                },
+                "WARNING",
+            )
             return 1.0
+
 
 # At the end of the file, create and export a single config instance
 config = Config()

@@ -35,11 +35,7 @@ def dice_roll_command(args: list[str]) -> str:
         else:
             raise InvalidInputError(f"Invalid argument received: {arg}")
 
-    flattened_rolls = [
-        r
-        for roll in rolls
-        for r in roll
-    ]
+    flattened_rolls = [r for roll in rolls for r in roll]
 
     rolled_sum = 0
     for r in flattened_rolls:
@@ -72,14 +68,20 @@ def roll_dice(dice: str, negative_modifier: bool) -> list[int]:
 
     if not range_validator(num_dice, dice_lower_bound, dice_upper_bound):
         raise InvalidInputError(
-            f"I'm sorry, number of dice are out of range. Please provide number of dices in the range [{dice_lower_bound}, {dice_upper_bound}].")
+            (
+                f"I'm sorry, number of dice are out of range. "
+                f"Please provide number of dices in the range [{dice_lower_bound}, {dice_upper_bound}]."
+            )
+        )
 
     side_lower_bound = 2
     side_upper_bound = 1000
 
     if not range_validator(num_sides, side_lower_bound, side_upper_bound):
         raise InvalidInputError(
-            f"I'm sorry, number of sides of a dice are out of range. Please provide number of dices in the range [{side_lower_bound}, {side_upper_bound}].")
+            f"I'm sorry, number of sides of a dice are out of range. "
+            f"Please provide number of dices in the range [{side_lower_bound}, {side_upper_bound}]."
+        )
 
     rolls = []
     for i in range(0, num_dice):

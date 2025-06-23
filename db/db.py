@@ -1,8 +1,16 @@
 import os
-from config import config
 
-from models import orm_db, CurrencyRate, DailyChecklist, DailyChecklistCheck, HangmanGame, Reminder, WorldClock
 import todo
+from config import config
+from models import (
+    CurrencyRate,
+    DailyChecklist,
+    DailyChecklistCheck,
+    HangmanGame,
+    Reminder,
+    WorldClock,
+    orm_db,
+)
 
 
 def create_dbs():
@@ -10,7 +18,7 @@ def create_dbs():
 
     # Ensure DB file exists
     if not os.path.exists(config.db_orm_path):
-        open(config.db_orm_path, 'a').close()
+        open(config.db_orm_path, "a").close()
         print("DB Created!")
     else:
         print("DB already exists")

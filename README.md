@@ -1,6 +1,6 @@
 # discord-bot-py
 
-### Running discord-bot
+## Running discord-bot
 
 In order to run the discord bot, you need a .env file with the `DISCORD_TOKEN` filled out. You can copy the `.env.example` file to `.env` and add your bot token that has access to a discord server of your choice.
 
@@ -9,5 +9,30 @@ Once the `DISCORD_TOKEN` has been added, you can run the bot with
 python bot.py
 ```
 
+## Testing
+
+To run the test suite:
+
+```sh
+ENV=TEST pytest
+```
+
+## Linting & Code Style
+
+To check code style and linting, run:
+
+```sh
+flake8 .
+black --check .
+isort --check-only .
+```
+
+- `flake8` checks for general linting issues.
+- `black --check` checks code formatting (auto-format with `black .`).
+- `isort --check-only` checks import order (auto-fix with `isort .`).
+
+---
+
 ### Links used:
 https://fallendeity.github.io/discord.py-masterclass/slash-commands/#slash-command-parameters
+https://www.tweag.io/blog/2023-04-04-python-monorepo-1/

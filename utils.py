@@ -1,7 +1,8 @@
-import re
 import functools
-import discord
+import re
 from decimal import Decimal
+
+import discord
 
 
 def is_numeric(value: str) -> bool:
@@ -21,7 +22,7 @@ def format_number(n, precision=4) -> str:
     if isinstance(n, int):
         return str(n)
     if isinstance(n, (float, Decimal)):
-        return f"{Decimal(n).quantize(Decimal(f'1.{'0'*precision}'))}".rstrip('0').rstrip('.')
+        return f"{Decimal(n).quantize(Decimal(f'1.{'0'*precision}'))}".rstrip("0").rstrip(".")
     return f"{n:.{precision}g}"
 
 
@@ -38,4 +39,5 @@ def guild_only(func):
             await interaction.response.send_message("This command is only available in servers.", ephemeral=True)
             return
         return await func(*args, **kwargs)
+
     return wrapper

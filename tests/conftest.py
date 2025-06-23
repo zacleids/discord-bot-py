@@ -1,5 +1,6 @@
 import os
 import sys
+
 import pytest
 
 from db.db import create_dbs
@@ -8,6 +9,7 @@ from models import orm_db
 # Ensure the environment is set to TEST
 if os.environ.get("ENV") != "TEST":
     sys.exit("ERROR: Tests can only be run when ENV=TEST")
+
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():

@@ -1,6 +1,7 @@
 import os
 import sqlite3
-from db.db import orm_db, create_dbs
+
+from db.db import create_dbs, orm_db
 from time_funcs import WorldClock
 
 # Get the absolute path of the db file relative to the script's location
@@ -19,12 +20,7 @@ create_dbs()
 # Insert entries into the new world_clock table
 with orm_db.atomic():
     for entry in entries:
-        WorldClock.create(
-            guild_id=entry[0],
-            timezone_str=entry[1],
-            label=entry[2],
-            created_at=entry[3]
-        )
+        WorldClock.create(guild_id=entry[0], timezone_str=entry[1], label=entry[2], created_at=entry[3])
 orm_db.close()
 
 print("Migration completed successfully.")
