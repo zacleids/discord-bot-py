@@ -14,9 +14,9 @@ def print_win_str(bot_choice: RPSChoice, player_choice: RPSChoice) -> str:
     if player_choice == bot_choice:
         result = "It's a tie!"
     elif (
-            (player_choice == RPSChoice.Rock and bot_choice == RPSChoice.Scissors) or
-            (player_choice == RPSChoice.Paper and bot_choice == RPSChoice.Rock) or
-            (player_choice == RPSChoice.Scissors and bot_choice == RPSChoice.Paper)
+        (player_choice == RPSChoice.Rock and bot_choice == RPSChoice.Scissors)
+        or (player_choice == RPSChoice.Paper and bot_choice == RPSChoice.Rock)
+        or (player_choice == RPSChoice.Scissors and bot_choice == RPSChoice.Paper)
     ):
         result = "You win!"
     else:
@@ -39,8 +39,10 @@ def play_rock_paper_scissors(args: list[str]) -> str:
             bot_choice = random.choice(list(RPSChoice))
             return print_win_str(bot_choice, player_choice)
     except ValueError:
-        return random.choice([
-            "I dont know what you're trying to pull",
-            f"I didnt know we were playing Rock, Paper, Scissors, and {player_choice_str}. How do you play?",
-            "That is neither rock, nor paper, nor scissors"
-        ])
+        return random.choice(
+            [
+                "I dont know what you're trying to pull",
+                f"I didnt know we were playing Rock, Paper, Scissors, and {player_choice_str}. How do you play?",
+                "That is neither rock, nor paper, nor scissors",
+            ]
+        )

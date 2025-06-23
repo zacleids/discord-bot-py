@@ -9,6 +9,7 @@ import contextvars
 from config import config
 from logging.handlers import RotatingFileHandler
 
+
 # --- JsonFormatter for structured logging ---
 class JsonFormatter(logging.Formatter):
     def format(self, record):
@@ -23,6 +24,7 @@ class JsonFormatter(logging.Formatter):
             log_record["exc_info"] = self.formatException(record.exc_info)
         return json.dumps(log_record, ensure_ascii=False)
 
+
 # --- Logger setup (file + console, JSON if possible) ---
 logger = logging.getLogger("discord_bot")
 logger.setLevel(getattr(logging, config.log_level, logging.INFO))
@@ -30,9 +32,7 @@ logger.propagate = False  # Prevent propagation to root logger
 formatter = JsonFormatter()
 
 # Use RotatingFileHandler for log rotation (5MB per file, 3 backups)
-file_handler = RotatingFileHandler(
-    "bot.log", maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
-)
+file_handler = RotatingFileHandler("bot.log", maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
 file_handler.setFormatter(formatter)
 if not any(isinstance(h, RotatingFileHandler) for h in logger.handlers):
     logger.addHandler(file_handler)
@@ -46,12 +46,14 @@ if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.Fi
 # --- Context variable for ray id ---
 ray_id_var = contextvars.ContextVar("ray_id", default=None)
 
+
 def get_ray_id():
     ray_id = ray_id_var.get()
     if ray_id is None:
         ray_id = str(uuid.uuid4())
         ray_id_var.set(ray_id)
     return ray_id
+
 
 async def with_ray_id(func, *args, **kwargs):
     ray_id = str(uuid.uuid4())
@@ -60,6 +62,7 @@ async def with_ray_id(func, *args, **kwargs):
         return await func(*args, **kwargs)
     finally:
         ray_id_var.reset(token)
+
 
 def log_event(event_type, context={}, level="INFO"):
     """
@@ -94,23 +97,27 @@ def log_and_send_message_command(message, content=None, *, files=None, exec_time
         "user_id": getattr(message.author, "id", None),
         "content": content,
         "file_count": len(files) if files else 0,
-        "exec_time": exec_time
+        "exec_time": exec_time,
     }
     log_event("OUTGOING_COMMAND", log_context)
     # Performance warning for slow message commands
     if exec_time is not None and exec_time > config.performance_warning_threshold:
-        log_event("PERFORMANCE_WARNING", {
-            "ray_id": ray_id,
-            "event": "PERFORMANCE_WARNING",
-            "command_type": "message_command",
-            "exec_time": exec_time,
-            "performance_warning_threshold": config.performance_warning_threshold,
-            "message_id": getattr(message, "id", None),
-            "channel_id": getattr(message.channel, "id", None),
-            "guild_id": getattr(message.guild, "id", None) if message.guild else None,
-            "user_id": getattr(message.author, "id", None),
-            "content": content
-        }, level="warning")
+        log_event(
+            "PERFORMANCE_WARNING",
+            {
+                "ray_id": ray_id,
+                "event": "PERFORMANCE_WARNING",
+                "command_type": "message_command",
+                "exec_time": exec_time,
+                "performance_warning_threshold": config.performance_warning_threshold,
+                "message_id": getattr(message, "id", None),
+                "channel_id": getattr(message.channel, "id", None),
+                "guild_id": getattr(message.guild, "id", None) if message.guild else None,
+                "user_id": getattr(message.author, "id", None),
+                "content": content,
+            },
+            level="warning",
+        )
     if files:
         return message.channel.send(content, files=files, **kwargs)
     else:
@@ -124,10 +131,10 @@ def log_and_send_message_interaction(interaction: discord.Interaction, content=N
     """
     ray_id = get_ray_id()
     embeds = kwargs.get("embeds", [])
-    embed_log = [e.to_dict() if hasattr(e, 'to_dict') else str(e) for e in embeds] if embeds else []
+    embed_log = [e.to_dict() if hasattr(e, "to_dict") else str(e) for e in embeds] if embeds else []
     embed = kwargs.get("embed", None)
     if embed:
-        embed_log.append(embed.to_dict() if hasattr(embed, 'to_dict') else str(embed))
+        embed_log.append(embed.to_dict() if hasattr(embed, "to_dict") else str(embed))
     # Ensure files is always a list (never None)
     files = files if files is not None else []
     log_context = {
@@ -140,7 +147,7 @@ def log_and_send_message_interaction(interaction: discord.Interaction, content=N
         "content": content,
         "embeds": embed_log,
         "file_count": len(files),
-        "exec_time": exec_time
+        "exec_time": exec_time,
     }
     log_event("OUTGOING_INTERACTION", log_context)
     # Use response.send_message if not responded, else followup.send
@@ -152,9 +159,11 @@ def log_and_send_message_interaction(interaction: discord.Interaction, content=N
 
 def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
     import functools
+
     @functools.wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> None:
         import time
+
         # Extract the interaction object
         interaction = None
         for arg in args:
@@ -169,13 +178,14 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
             server_id = interaction.guild.id if interaction.guild else None
             if hasattr(interaction.channel, "name"):
                 channel_name = interaction.channel.name
-                channel_id = getattr(interaction.channel, 'id', None)
+                channel_id = getattr(interaction.channel, "id", None)
             else:
                 channel_name = f"DM with {interaction.user.name}"
                 channel_id = None
             user_name = interaction.user.name
             user_id = interaction.user.id
             command_path = f"/{interaction.command.qualified_name}" if interaction.command else ""
+
             # Try to serialize args and kwargs as JSON, fallback to str if not possible
             def try_json(obj):
                 try:
@@ -183,10 +193,11 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
                     return obj
                 except Exception:
                     return str(obj)
+
             args_json = try_json(args[1:])  # Skip the first arg (interaction itself)
             kwargs_json = try_json(kwargs)
-            interaction_id = getattr(interaction, 'id', None)
-            locale = getattr(interaction, 'locale', None)
+            interaction_id = getattr(interaction, "id", None)
+            locale = getattr(interaction, "locale", None)
             log_context = {
                 "ray_id": ray_id,
                 "event": "INCOMING_SLASH_COMMAND",
@@ -201,40 +212,47 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
                 "args": args_json,
                 "kwargs": kwargs_json,
                 "locale": locale,
-                "function": func.__name__
+                "function": func.__name__,
             }
             log_event("INCOMING_INTERACTION", log_context)
         else:
-            log_event("INCOMING_INTERACTION", {
-                "ray_id": ray_id,
-                "event": "INCOMING_SLASH_COMMAND",
-                "interaction_id": None,
-                "function": func.__name__
-            })
+            log_event(
+                "INCOMING_INTERACTION",
+                {"ray_id": ray_id, "event": "INCOMING_SLASH_COMMAND", "interaction_id": None, "function": func.__name__},
+            )
         try:
             await func(*args, **kwargs)
         finally:
             exec_time = time.perf_counter() - start_time
-            log_event("EXECUTION_TIME", {
-                "ray_id": ray_id,
-                "event": "SLASH_COMMAND_EXECUTION_TIME",
-                "interaction_id": getattr(interaction, 'id', None) if interaction else None,
-                "function": func.__name__,
-                "exec_time": exec_time
-            })
+            log_event(
+                "EXECUTION_TIME",
+                {
+                    "ray_id": ray_id,
+                    "event": "SLASH_COMMAND_EXECUTION_TIME",
+                    "interaction_id": getattr(interaction, "id", None) if interaction else None,
+                    "function": func.__name__,
+                    "exec_time": exec_time,
+                },
+            )
             # Performance warning for slow slash commands
             if exec_time > config.performance_warning_threshold:
-                log_event("PERFORMANCE_WARNING", {
-                    "ray_id": ray_id,
-                    "event": "PERFORMANCE_WARNING",
-                    "command_type": "slash_command",
-                    "exec_time": exec_time,
-                    "performance_warning_threshold": config.performance_warning_threshold,
-                    "interaction_id": getattr(interaction, 'id', None) if interaction else None,
-                    "function": func.__name__
-                }, level="warning")
+                log_event(
+                    "PERFORMANCE_WARNING",
+                    {
+                        "ray_id": ray_id,
+                        "event": "PERFORMANCE_WARNING",
+                        "command_type": "slash_command",
+                        "exec_time": exec_time,
+                        "performance_warning_threshold": config.performance_warning_threshold,
+                        "interaction_id": getattr(interaction, "id", None) if interaction else None,
+                        "function": func.__name__,
+                    },
+                    level="warning",
+                )
+
     wrapper.__signature__ = inspect.signature(func)
     return wrapper
+
 
 # After logger setup, flush any buffered config log events
 config.flush_log_buffer()

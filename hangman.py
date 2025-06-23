@@ -20,14 +20,12 @@ EIGHT_HOURS = 8 * 60 * 60
 def get_active_hangman_game(guild_id: int) -> HangmanGame | None:
     now = int(datetime.now().timestamp())
     try:
-        query = (HangmanGame
-                 .select()
-                 .where((HangmanGame.guild_id == guild_id) &
-                        (HangmanGame.game_over == False) &
-                        (HangmanGame.created_at > (now - EIGHT_HOURS)))
-                 .order_by(HangmanGame.created_at.desc())
-                 .get()
-                 )
+        query = (
+            HangmanGame.select()
+            .where((HangmanGame.guild_id == guild_id) & (HangmanGame.game_over == False) & (HangmanGame.created_at > (now - EIGHT_HOURS)))
+            .order_by(HangmanGame.created_at.desc())
+            .get()
+        )
         # WHERE guild_id = ?
         # AND game_over = 0
         # AND datetime(created_at) >= datetime('now', '-8 hours')""", (guild_id,))
@@ -56,7 +54,39 @@ def validate_chars(chars: str) -> tuple[bool, str]:
 
 
 def calculate_board(game: HangmanGame):
-    pass_through_chars = {" ", "?", "!", "'", '"', ".", ",", "<", ">", "=", "-", "+", "*", "/", ":", ";", "(", ")", "{", "}", "[", "]", "|", "@", "#", "$", "%", "^", "&", "`", "~"}
+    pass_through_chars = {
+        " ",
+        "?",
+        "!",
+        "'",
+        '"',
+        ".",
+        ",",
+        "<",
+        ">",
+        "=",
+        "-",
+        "+",
+        "*",
+        "/",
+        ":",
+        ";",
+        "(",
+        ")",
+        "{",
+        "}",
+        "[",
+        "]",
+        "|",
+        "@",
+        "#",
+        "$",
+        "%",
+        "^",
+        "&",
+        "`",
+        "~",
+    }
     guessed_set = set(game.guessed_characters)
     pass_through_chars.update(guessed_set)
     game.board = "".join(char if char.lower() in pass_through_chars else r"\_" for char in game.phrase)
@@ -69,7 +99,7 @@ def calculate_board(game: HangmanGame):
 
 
 def print_board(game: HangmanGame) -> str:
-    extra_str = ''
+    extra_str = ""
     incorrect_guesses = [guess for guess in game.guessed_characters if guess not in game.phrase]
     if incorrect_guesses:
         extra_str += f"\nIncorrect guesses: {', '.join(incorrect_guesses)}"
@@ -85,7 +115,7 @@ def print_board(game: HangmanGame) -> str:
                 "Amazing, a perfect game!",
                 "Wow, not a single letter guessed wrong!",
                 "You nailed it, a perfect game!",
-                "Great job not missing even once."
+                "Great job not missing even once.",
             ]
             extra_str += f"\n{random.choice(perfect_game_congrats)}"
     return f"{game.board}{extra_str}"

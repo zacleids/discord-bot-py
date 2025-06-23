@@ -70,7 +70,7 @@ FORTUNES = [
     "You will conquer obstacles to achieve success.",
     "The fortune you seek is in another cookie.",
     "Hard work pays off in the future, laziness pays off now.",
-    #Snarky fortunes
+    # Snarky fortunes
     "What do I look like, a fortune teller!",
     "Your shampoo dosent always like your concerts.",
     "Your lucky number is 42, but only on Tuesdays.",
@@ -80,13 +80,12 @@ FORTUNES = [
     "Never bite the hand that fingers you.",
     "The Moon is in pisces I think, so that probably means you're lucky or something."
     "You learn from your mistakes... You will learn a lot today.",
-    "tell me why, aint nothing but a heart ache- wtf!? im showering is privacy too much to ask?"
-    "you know the rules and so do I!",
-    "https://www.youtube.com/watch?v=dQw4w9WgXcQ", #Rickroll link
+    "tell me why, aint nothing but a heart ache- wtf!? im showering is privacy too much to ask?" "you know the rules and so do I!",
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",  # Rickroll link
     "You will be Rickrolled today.",
     "Good news! You're the protaginist in your life story. Bad news: it's a Seinfeld episode.",
     "Success is around the corner, but remember, but so is failure, waiting with a warm smile.",
-    ]
+]
 
 # Tracks (user_id, date) -> count
 _fortune_counter: Dict[Tuple[int, str], int] = {}
@@ -106,10 +105,11 @@ SNARKY_LINES = [
     "You've already asked {num} times, but here it is again:",
 ]
 
+
 def get_fortune(user_id: int, date: str = None) -> str:
     if date is None:
         date = datetime.now().strftime("%Y-%m-%d")
-    
+
     key = (user_id, date)
     count = _fortune_counter.get(key, 0) + 1
     _fortune_counter[key] = count
@@ -122,6 +122,7 @@ def get_fortune(user_id: int, date: str = None) -> str:
         snark = random.choice(SNARKY_LINES).replace("{num}", str(count))
         return f"{snark}\n{fortune}"
     return fortune
+
 
 def _get_deterministic_fortune(user_id: int, date: str) -> str:
     seed_str = f"{user_id}-{date}"

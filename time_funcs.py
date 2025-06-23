@@ -11,11 +11,13 @@ all_timezones_lower = list(map(str.lower, all_timezones))
 
 DB_NAME = "db/bot.db"
 
+
 def get_timezone(guild_id: int, timezone_str: str) -> WorldClock:
     try:
         return WorldClock.get(WorldClock.guild_id == guild_id, WorldClock.timezone_str == timezone_str)
     except WorldClock.DoesNotExist:
         return None
+
 
 def add_timezone(guild_id: int, timezone_str: str, label=None) -> str:
     if WorldClock.select().where(WorldClock.guild_id == guild_id, WorldClock.timezone_str == timezone_str).exists():
@@ -49,7 +51,7 @@ def format_tzs_response_str(tzs: list[WorldClock]) -> str:
 
     for tz in tzs:
         result += tz.format() + "\n"
-        
+
     return result
 
 
@@ -106,11 +108,7 @@ class EditTimezoneLabelModal(discord.ui.Modal, title="Edit Timezone Label"):
         self.timezone_str = timezone_str
 
         # Prefill the text field with the existing task
-        self.task_input = discord.ui.TextInput(
-            label="Edit label",
-            default=existing_label,
-            style=discord.TextStyle.short
-        )
+        self.task_input = discord.ui.TextInput(label="Edit label", default=existing_label, style=discord.TextStyle.short)
         self.add_item(self.task_input)
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -123,5 +121,6 @@ def format(wc: WorldClock) -> str:
     label = wc.label + " | " if wc.label else ""
     zone = wc.timezone_str
     return f"{label}{zone}: **{format_time(datetime.now(ZoneInfo(zone)))}**"
+
 
 WorldClock.format = format

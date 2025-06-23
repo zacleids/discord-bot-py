@@ -3,12 +3,14 @@ from discord import app_commands
 from utils import format_number
 import math
 
+
 class UnitCategory(Enum):
     LENGTH = "length"
     MASS = "mass"
     VOLUME = "volume"
     TEMPERATURE = "temperature"
     VELOCITY = "velocity"
+
 
 class UnitType(Enum):
     # Length
@@ -45,6 +47,7 @@ class UnitType(Enum):
     def category(self):
         return self.value[1]
 
+
 class UnitTypeChoice(Enum):
     Meter = "Meter"
     Kilometer = "Kilometer"
@@ -70,6 +73,7 @@ class UnitTypeChoice(Enum):
     Meter_per_second = "Meter per second"
     Kilometer_per_hour = "Kilometer per hour"
     Mile_per_hour = "Mile per hour"
+
 
 # Conversion factors to base units (meter, gram, liter)
 CONVERSION_FACTORS = {
@@ -97,7 +101,7 @@ CONVERSION_FACTORS = {
     # Velocity to meter/second
     UnitType.METER_PER_SECOND: 1.0,
     UnitType.KILOMETER_PER_HOUR: 0.277778,  # 1 kph = 0.277778 m/s
-    UnitType.MILE_PER_HOUR: 0.44704,        # 1 mph = 0.44704 m/s
+    UnitType.MILE_PER_HOUR: 0.44704,  # 1 mph = 0.44704 m/s
     # Temperature handled separately
 }
 
@@ -191,6 +195,7 @@ UNIT_ALIASES = {
     "miles/hour": UnitType.MILE_PER_HOUR,
 }
 
+
 def parse_unit(unit_str: str) -> UnitType:
     key = unit_str.strip().replace(".", "").replace("_", " ").lower()
     key = key.replace(" ", "")  # Remove spaces for keys like 'fluid ounce'
@@ -201,8 +206,9 @@ def parse_unit(unit_str: str) -> UnitType:
     except KeyError:
         raise KeyError(f"Unknown unit: {unit_str}")
 
+
 def format_unit_name(unit: UnitType, value: float = 1) -> str:
-    name = unit.name.capitalize().replace('_', ' ')
+    name = unit.name.capitalize().replace("_", " ")
 
     plural_map = {
         "foot": "Feet",
@@ -215,7 +221,7 @@ def format_unit_name(unit: UnitType, value: float = 1) -> str:
         "liter": "Liters",
         "pound": "Pounds",
         "ounce": "Ounces",
-        "fluid ounce": "Fluid Ounces"
+        "fluid ounce": "Fluid Ounces",
     }
 
     def pluralize(word):
@@ -232,37 +238,42 @@ def format_unit_name(unit: UnitType, value: float = 1) -> str:
             return pluralize(name)
     return name
 
+
 def format_unit_category(unit: UnitType) -> str:
     return unit.category.value
+
 
 def convert_temperature(from_unit: UnitType, to_unit: UnitType, number: float) -> float:
     if from_unit == UnitType.CELSIUS:
         if to_unit == UnitType.FAHRENHEIT:
-            return number * 9/5 + 32
+            return number * 9 / 5 + 32
         elif to_unit == UnitType.KELVIN:
             return number + 273.15
         else:
             return number
     elif from_unit == UnitType.FAHRENHEIT:
         if to_unit == UnitType.CELSIUS:
-            return (number - 32) * 5/9
+            return (number - 32) * 5 / 9
         elif to_unit == UnitType.KELVIN:
-            return (number - 32) * 5/9 + 273.15
+            return (number - 32) * 5 / 9 + 273.15
         else:
             return number
     elif from_unit == UnitType.KELVIN:
         if to_unit == UnitType.CELSIUS:
             return number - 273.15
         elif to_unit == UnitType.FAHRENHEIT:
-            return (number - 273.15) * 9/5 + 32
+            return (number - 273.15) * 9 / 5 + 32
         else:
             return number
     else:
         raise ValueError("Unknown temperature unit.")
 
+
 def convert_units(from_unit: UnitType, to_unit: UnitType, number: float) -> float:
     if from_unit.category != to_unit.category:
-        raise ValueError(f"Incompatible units: {format_unit_name(from_unit)} ({format_unit_category(from_unit)}) and {format_unit_name(to_unit)} ({format_unit_category(to_unit)}).")
+        raise ValueError(
+            f"Incompatible units: {format_unit_name(from_unit)} ({format_unit_category(from_unit)}) and {format_unit_name(to_unit)} ({format_unit_category(to_unit)})."
+        )
     if from_unit.category == UnitCategory.TEMPERATURE:
         return convert_temperature(from_unit, to_unit, number)
     # Convert to base unit
@@ -271,17 +282,16 @@ def convert_units(from_unit: UnitType, to_unit: UnitType, number: float) -> floa
     result = base_value / CONVERSION_FACTORS[to_unit]
     return result
 
-def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float, height_display: bool = False, feet_inches_input: tuple[int, int] = None) -> str:
+
+def get_conversion_display(
+    from_unit: UnitType, to_unit: UnitType, number: float, height_display: bool = False, feet_inches_input: tuple[int, int] = None
+) -> str:
     result = convert_units(from_unit, to_unit, number)
     number_display = format_number(number)
 
     # Special formatting for temperature
     if from_unit.category == UnitCategory.TEMPERATURE and to_unit.category == UnitCategory.TEMPERATURE:
-        unit_symbols = {
-            UnitType.CELSIUS: "°C",
-            UnitType.FAHRENHEIT: "°F",
-            UnitType.KELVIN: "°K"
-        }
+        unit_symbols = {UnitType.CELSIUS: "°C", UnitType.FAHRENHEIT: "°F", UnitType.KELVIN: "°K"}
         from_symbol = unit_symbols.get(from_unit, from_unit.name)
         to_symbol = unit_symbols.get(to_unit, to_unit.name)
         return f"{number_display}{from_symbol} = {format_number(result)}{to_symbol}"
@@ -301,7 +311,7 @@ def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float
             right = f"{format_number(result)} {format_unit_name(to_unit, result)}"
             return f"{left} = {right}"
         return f"{number_display} {format_unit_name(from_unit, number)} = {feet} ft {inches} in"
-    
+
     # If input was feet/inches, display as 6' 2" = 188 cm
     if feet_inches_input:
         f, i = feet_inches_input
@@ -311,8 +321,9 @@ def get_conversion_display(from_unit: UnitType, to_unit: UnitType, number: float
             left = f"{f} ft"
         right = f"{format_number(result)} {format_unit_name(to_unit, result)}"
         return f"{left} = {right}"
-    
+
     return f"{number_display} {format_unit_name(from_unit, number)} = {format_number(result)} {format_unit_name(to_unit, result)}"
+
 
 def handle_conversion_command(args: list[str]) -> str:
     usage = "Usage: !conversion <from_unit> <to_unit> <number> (e.g., !conversion meter foot 10)"
