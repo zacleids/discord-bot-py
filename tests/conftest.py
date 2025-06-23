@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-from db.db import create_dbs
-from models import orm_db
+from shared.db.db import create_dbs
+from shared.models import orm_db
 
 # Ensure the environment is set to TEST
 if os.environ.get("ENV") != "TEST":

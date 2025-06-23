@@ -6,7 +6,7 @@ In order to run the discord bot, you need a .env file with the `DISCORD_TOKEN` f
 
 Once the `DISCORD_TOKEN` has been added, you can run the bot with
 ```sh
-python bot.py
+python run.py
 ```
 
 ## Development Setup

@@ -318,10 +318,8 @@ $RECYCLE.BIN/
 
 temp/
 
-db/bot.db
-db/bot_orm.db
+shared/db/bot.db
+shared/db/bot_orm.db
 
-db/test.db
-db/test_orm.db
-
-playgorund.py
+shared/db/test.db
+shared/db/test_orm.db
