@@ -4,16 +4,6 @@ import re
 from datetime import datetime
 import emoji
 
-from peewee import *
-
-from models import orm_db
-
-
-class BaseModel(Model):
-    class Meta:
-        database = orm_db
-
-
 EIGHT_HOURS = 8 * 60 * 60
 
 
@@ -22,14 +12,18 @@ def get_active_hangman_game(guild_id: int) -> HangmanGame | None:
     try:
         query = (
             HangmanGame.select()
-            .where((HangmanGame.guild_id == guild_id) & (HangmanGame.game_over == False) & (HangmanGame.created_at > (now - EIGHT_HOURS)))
+            .where(
+                (HangmanGame.guild_id == guild_id)
+                & (HangmanGame.game_over == False)  # noqa: E712
+                & (HangmanGame.created_at > (now - EIGHT_HOURS))
+            )
             .order_by(HangmanGame.created_at.desc())
             .get()
         )
         # WHERE guild_id = ?
         # AND game_over = 0
         # AND datetime(created_at) >= datetime('now', '-8 hours')""", (guild_id,))
-    except:
+    except HangmanGame.DoesNotExist:
         return None
 
     # print(f"querry: {query}")

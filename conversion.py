@@ -1,5 +1,4 @@
 from enum import Enum
-from discord import app_commands
 from utils import format_number
 import math
 
@@ -272,7 +271,10 @@ def convert_temperature(from_unit: UnitType, to_unit: UnitType, number: float) -
 def convert_units(from_unit: UnitType, to_unit: UnitType, number: float) -> float:
     if from_unit.category != to_unit.category:
         raise ValueError(
-            f"Incompatible units: {format_unit_name(from_unit)} ({format_unit_category(from_unit)}) and {format_unit_name(to_unit)} ({format_unit_category(to_unit)})."
+            (
+                f"Incompatible units: {format_unit_name(from_unit)} ({format_unit_category(from_unit)}) and "
+                f"{format_unit_name(to_unit)} ({format_unit_category(to_unit)})."
+            )
         )
     if from_unit.category == UnitCategory.TEMPERATURE:
         return convert_temperature(from_unit, to_unit, number)

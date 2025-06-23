@@ -1,13 +1,14 @@
 import sys
 import os
+import pytest
+
+from color import is_valid_hex_code, formate_rgb_tuple, generate_random_color, handle_color_command
+from errors import InvalidInputError
+
 
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 )  # This line is necessary to import the module from the parent directory
-
-import pytest
-from color import is_valid_hex_code, formate_rgb_tuple, generate_random_color, handle_color_command
-from errors import InvalidInputError
 
 
 # Test is_valid_hex_code

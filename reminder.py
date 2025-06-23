@@ -42,4 +42,4 @@ class EditReminderModal(discord.ui.Modal, title="Edit Reminder"):
         reminder_instance.remind_at = new_remind_at
         reminder_instance.save()
 
-        await interaction.response.send_message(f"Reminder updated successfully!", ephemeral=True)
+        await interaction.response.send_message("Reminder updated successfully!", ephemeral=True)

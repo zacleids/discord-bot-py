@@ -154,15 +154,13 @@ def test_get_active_hangman_game_negative():
     # Game is too old
     old_guild_id = 22
     old_time = int(time.time()) - (9 * 60 * 60)  # 9 hours ago
-    old_game = HangmanGame.create(guild_id=old_guild_id, user_id=USER_ID, phrase="old", num_guesses=5, created_at=old_time, game_over=False)
+    HangmanGame.create(guild_id=old_guild_id, user_id=USER_ID, phrase="old", num_guesses=5, created_at=old_time, game_over=False)
     found = get_active_hangman_game(old_guild_id)
     assert found is None
     # Game is over
     over_guild_id = 33
     recent_time = int(time.time())
-    over_game = HangmanGame.create(
-        guild_id=over_guild_id, user_id=USER_ID, phrase="over", num_guesses=5, created_at=recent_time, game_over=True
-    )
+    HangmanGame.create(guild_id=over_guild_id, user_id=USER_ID, phrase="over", num_guesses=5, created_at=recent_time, game_over=True)
     found = get_active_hangman_game(over_guild_id)
     assert found is None
 

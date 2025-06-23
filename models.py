@@ -1,3 +1,4 @@
+# flake8: noqa: F405
 from peewee import *
 import datetime
 from config import config

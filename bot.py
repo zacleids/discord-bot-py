@@ -1,17 +1,16 @@
-import asyncio
 from datetime import datetime, timedelta, timezone
-
-import emoji
+import asyncio
+import atexit
 import os
 import random
-import re
-
 import discord
-import discord.ext
-from discord.ext import tasks, commands
+from discord.ext import tasks
 import platform
 import pytz
-from dotenv import load_dotenv
+import uuid
+import logging
+import signal
+import sys
 
 import coin
 import color
@@ -33,10 +32,7 @@ from log import log_interaction, log_and_send_message_command, log_and_send_mess
 from reminder import Reminder, EditReminderModal
 from config import config
 from utils import format_number, guild_only
-import uuid
-import logging
-import signal
-import sys
+
 
 # Create bot instance
 intents = discord.Intents.default()
@@ -390,7 +386,7 @@ async def roll_slash_command(interaction: discord.Interaction, dice_roll: str):
 
 @tree.command(name="random", description="generate a random number")
 @log_interaction
-async def roll_slash_command(interaction: discord.Interaction, number1: float, number2: float):
+async def random_slash_command(interaction: discord.Interaction, number1: float, number2: float):
     result = dice.random_command([str(number1), str(number2)])
     await log_and_send_message_interaction(interaction, result)
 
@@ -773,8 +769,12 @@ async def reminder_add_slash_command(
 @log_interaction
 async def reminder_list_slash_command(interaction: discord.Interaction, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
-    public_reminders = Reminder.select().where(Reminder.user_id == user.id, Reminder.is_private == False).order_by(Reminder.remind_at)
-    private_reminders = Reminder.select().where(Reminder.user_id == user.id, Reminder.is_private == True).order_by(Reminder.remind_at)
+    public_reminders = (
+        Reminder.select().where(Reminder.user_id == user.id, Reminder.is_private == False).order_by(Reminder.remind_at)  # noqa: E712
+    )
+    private_reminders = (
+        Reminder.select().where(Reminder.user_id == user.id, Reminder.is_private == True).order_by(Reminder.remind_at)  # noqa: E712
+    )
 
     response = "**Your upcoming public reminders:**\n"
     if public_reminders:
@@ -957,7 +957,12 @@ async def on_error(interaction: discord.Interaction[discord.Client], error: disc
     )
     if isinstance(error, discord.app_commands.errors.CommandInvokeError):
         error = error.original
-    message = f"\nException: {error.__class__.__name__}, Error: {error}, Command: {interaction.command.qualified_name if interaction.command else None}, User: {interaction.user}, Time: {discord.utils.format_dt(interaction.created_at, style='F')}\n"
+    message = (
+        f"\nException: {error.__class__.__name__}, Error: {error}, "
+        f"Command: {interaction.command.qualified_name if interaction.command else None}, "
+        f"User: {interaction.user}, "
+        f"Time: {discord.utils.format_dt(interaction.created_at, style='F')}\n"
+    )
 
     if isinstance(error, InvalidInputError):
         message = error
@@ -1124,8 +1129,6 @@ async def before_check_reminders():
     log_event("CHECK_REMINDERS_BEFORE_LOOP_START", level="info")
     try:
         # Add a timeout to see if this is hanging forever
-        import asyncio
-
         try:
             await asyncio.wait_for(client.wait_until_ready(), timeout=10)
             log_event("CHECK_REMINDERS_BEFORE_LOOP_DONE", level="info")
@@ -1185,6 +1188,5 @@ signal.signal(signal.SIGTERM, handle_exit)
 client.run(config.discord_token)
 
 # At the end of the file, add shutdown log
-import atexit
 
 atexit.register(lambda: log_event("SHUTDOWN", {"event": "SHUTDOWN", "ray_id": get_ray_id()}))

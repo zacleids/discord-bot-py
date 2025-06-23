@@ -324,3 +324,4 @@ db/bot_orm.db
 db/test.db
 db/test_orm.db
 
+playgorund.py

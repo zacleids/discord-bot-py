@@ -1,12 +1,9 @@
-from enum import Enum
 import pytz
 import requests
 import datetime
 from models import CurrencyRate, orm_db
 from utils import format_number
 from log import log_event, get_ray_id
-
-import datetime
 import json
 
 
@@ -176,7 +173,7 @@ def convert_currency(from_currency: str, to_currency: str, amount: float) -> flo
             },
             level="error",
         )
-        raise Exception(f"Currency not supported.")
+        raise Exception("Currency not supported.")
     # Convert from source to USD, then USD to target
     amount_in_usd = amount / rates[from_currency] if from_currency != BASE_CURRENCY else amount
     result = amount_in_usd * rates[to_currency] if to_currency != BASE_CURRENCY else amount_in_usd

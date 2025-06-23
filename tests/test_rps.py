@@ -1,5 +1,5 @@
 import pytest
-from rps import play_rock_paper_scissors, RPSChoice
+from rps import play_rock_paper_scissors
 from errors import InvalidInputError
 
 

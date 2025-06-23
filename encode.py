@@ -2,8 +2,6 @@ import base64
 import codecs
 from enum import Enum
 
-import discord
-
 # Morse code dictionary
 MORSE_CODE_DICT = {
     "A": ".-",

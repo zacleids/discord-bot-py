@@ -2,10 +2,10 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import discord
-from pytz import timezone, all_timezones
+from pytz import all_timezones
 
 from errors import InvalidInputError
-from models import orm_db, WorldClock
+from models import WorldClock
 
 all_timezones_lower = list(map(str.lower, all_timezones))
 
@@ -114,7 +114,7 @@ class EditTimezoneLabelModal(discord.ui.Modal, title="Edit Timezone Label"):
     async def on_submit(self, interaction: discord.Interaction):
         new_label = self.task_input.value
         update_timezone(self.guild_id, self.timezone_str, new_label)
-        await interaction.response.send_message(f"Label updated successfully!")
+        await interaction.response.send_message("Label updated successfully!")
 
 
 def format(wc: WorldClock) -> str:

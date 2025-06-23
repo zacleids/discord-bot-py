@@ -4,8 +4,8 @@ exclude =
     __pycache__,
     temp/*,
     migrations/*,
-    scripts/*
+    scripts/*,
+    .venv
 
 # required for compatibility with Black:
 extend-ignore = E203
-exclude = .venv

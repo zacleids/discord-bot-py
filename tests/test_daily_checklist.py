@@ -1,5 +1,4 @@
 import pytest
-from db.db import orm_db
 from db_test_utils import wipe_table
 from daily_checklist import (
     DailyChecklist,
@@ -117,7 +116,7 @@ def test_get_checklist_for_previous_date():
     # Setup: create a checklist item for a previous date
     previous_date = datetime.date.today() - datetime.timedelta(days=2)
     # Insert item directly into the DB with created_at set to previous_date
-    item = DailyChecklist.create(
+    DailyChecklist.create(
         user_id=USER_ID, item="Old Task", sort_order=1, created_at=datetime.datetime.combine(previous_date, datetime.time(12, 0))
     )
     # Should be visible for that date

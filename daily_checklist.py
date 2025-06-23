@@ -122,7 +122,6 @@ def get_checklist_for_date(user_id: int, date: datetime.date) -> List[Tuple[Dail
     date_end = date_start + datetime.timedelta(days=1)  # 4am PT the next day
 
     # Convert to UTC for database comparison since created_at is stored in UTC
-    date_start_utc = date_start.astimezone(pytz.UTC)
     date_end_utc = date_end.astimezone(pytz.UTC)
 
     items = list(

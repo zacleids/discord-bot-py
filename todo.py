@@ -1,6 +1,4 @@
 import sqlite3
-from typing import Optional
-
 import discord
 
 from errors import InvalidInputError
@@ -237,7 +235,7 @@ def handle_todo_command(args: list[str], user: discord.User, mentions: list[disc
 
             case "remove":
                 if mentions:
-                    result = f"Cannot remove task using ! version for another user. please use `/todo remove` and select the user"
+                    result = "Cannot remove task using ! version for another user. please use `/todo remove` and select the user"
                 elif not sub_args or not sub_args[0].isdigit():
                     result = "Please provide the ID of the task to remove."
                 else:

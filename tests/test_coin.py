@@ -1,13 +1,14 @@
 import sys
 import os
+import pytest
+
+from coin import flip_coin, flip_coins
+from errors import InvalidInputError
+
 
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 )  # This line is necessary to import the module from the parent directory
-
-import pytest
-from coin import flip_coin, flip_coins
-from errors import InvalidInputError
 
 
 # Test flip_coin returns one of the expected results

@@ -68,7 +68,10 @@ def roll_dice(dice: str, negative_modifier: bool) -> list[int]:
 
     if not range_validator(num_dice, dice_lower_bound, dice_upper_bound):
         raise InvalidInputError(
-            f"I'm sorry, number of dice are out of range. Please provide number of dices in the range [{dice_lower_bound}, {dice_upper_bound}]."
+            (
+                f"I'm sorry, number of dice are out of range. "
+                f"Please provide number of dices in the range [{dice_lower_bound}, {dice_upper_bound}]."
+            )
         )
 
     side_lower_bound = 2
@@ -76,7 +79,8 @@ def roll_dice(dice: str, negative_modifier: bool) -> list[int]:
 
     if not range_validator(num_sides, side_lower_bound, side_upper_bound):
         raise InvalidInputError(
-            f"I'm sorry, number of sides of a dice are out of range. Please provide number of dices in the range [{side_lower_bound}, {side_upper_bound}]."
+            f"I'm sorry, number of sides of a dice are out of range. "
+            f"Please provide number of dices in the range [{side_lower_bound}, {side_upper_bound}]."
         )
 
     rolls = []
