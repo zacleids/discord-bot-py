@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "discord-bot-py"
+version = "0.1.0"
+description = "A Discord bot written in Python."
+authors = ["Zac Leids <zacleids@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.14"
+"discord.py" = "*"
+
+[tool.poetry.dev-dependencies]
+flake8 = "*"
+pytest = "*"
+isort = "*"
+black = "*"
+pylint = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 140
+target-version = ['py310']
+
+[tool.pylint."messages control"]
+ignore = ["setup.py", "__init__.py"]
+disable = "all"
+enable = [
+  "empty-docstring",
+  "missing-class-docstring",
+  "missing-function-docstring",
+  "missing-module-docstring"
+]
+
+[tool.isort]
+profile = "black"
+known_first_party = ["discord_bot_py"] 

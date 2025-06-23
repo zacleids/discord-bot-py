@@ -1,0 +1,11 @@
+[flake8]
+max-line-length = 140
+exclude = 
+    __pycache__,
+    temp/*,
+    migrations/*,
+    scripts/*
+
+# required for compatibility with Black:
+extend-ignore = E203
+exclude = .venv

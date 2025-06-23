@@ -11,3 +11,4 @@ python bot.py
 
 ### Links used:
 https://fallendeity.github.io/discord.py-masterclass/slash-commands/#slash-command-parameters
+https://www.tweag.io/blog/2023-04-04-python-monorepo-1/
