@@ -1,9 +1,11 @@
+import datetime
+import json
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 import currency
 from models import CurrencyRate
-import json
-import datetime
 
 RATES = {"USD": 1.0, "EUR": 0.9, "MXN": 17.0, "JPY": 155.0}
 

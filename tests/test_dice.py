@@ -1,5 +1,6 @@
 import pytest
-from dice import dice_roll_command, roll_dice, random_command
+
+from dice import dice_roll_command, random_command, roll_dice
 from errors import InvalidInputError
 
 

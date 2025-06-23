@@ -1,10 +1,15 @@
-import sys
 import os
+import sys
+
 import pytest
 
-from color import is_valid_hex_code, formate_rgb_tuple, generate_random_color, handle_color_command
+from color import (
+    formate_rgb_tuple,
+    generate_random_color,
+    handle_color_command,
+    is_valid_hex_code,
+)
 from errors import InvalidInputError
-
 
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

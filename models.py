@@ -1,6 +1,8 @@
 # flake8: noqa: F405
-from peewee import *
 import datetime
+
+from peewee import *
+
 from config import config
 
 orm_db = SqliteDatabase(config.db_orm_path)

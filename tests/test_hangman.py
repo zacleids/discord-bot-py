@@ -1,6 +1,8 @@
-import pytest
 import time
-from hangman import validate_chars, HangmanGame, get_active_hangman_game
+
+import pytest
+
+from hangman import HangmanGame, get_active_hangman_game, validate_chars
 from tests.db_test_utils import wipe_table
 
 

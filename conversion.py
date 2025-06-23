@@ -1,6 +1,7 @@
-from enum import Enum
-from utils import format_number
 import math
+from enum import Enum
+
+from utils import format_number
 
 
 class UnitCategory(Enum):

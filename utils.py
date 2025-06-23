@@ -1,7 +1,8 @@
-import re
 import functools
-import discord
+import re
 from decimal import Decimal
+
+import discord
 
 
 def is_numeric(value: str) -> bool:

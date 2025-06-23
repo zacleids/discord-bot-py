@@ -1,4 +1,5 @@
 import pytest
+
 from encode import encode_decode, handle_encode_decode_command
 
 

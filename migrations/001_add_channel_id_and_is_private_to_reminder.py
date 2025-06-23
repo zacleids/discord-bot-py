@@ -1,6 +1,7 @@
+from pathlib import Path
+
 import peewee as pw
 from playhouse.migrate import SqliteMigrator, migrate
-from pathlib import Path
 
 # Construct the database path using pathlib with a relative path
 db_path = Path(__file__).resolve().parent.parent / "db" / "bot_orm.db"

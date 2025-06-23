@@ -1,8 +1,8 @@
 import re
+from pathlib import Path
 from random import randrange
 
 from PIL import Image, ImageColor
-from pathlib import Path
 
 from errors import InvalidInputError
 

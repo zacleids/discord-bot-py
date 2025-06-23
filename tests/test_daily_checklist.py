@@ -1,18 +1,19 @@
 import pytest
 from db_test_utils import wipe_table
+
 from daily_checklist import (
     DailyChecklist,
     DailyChecklistCheck,
     add_item,
-    format_checklist_response,
-    remove_item,
     check_item,
-    uncheck_item,
-    list_items,
-    get_checklist_for_date,
     edit_item,
-    move_item,
+    format_checklist_response,
+    get_checklist_for_date,
     get_current_day,
+    list_items,
+    move_item,
+    remove_item,
+    uncheck_item,
 )
 
 USER_ID = 1
@@ -111,6 +112,7 @@ def test_multiple_users_isolation():
 
 def test_get_checklist_for_previous_date():
     import datetime
+
     from daily_checklist import get_checklist_for_date
 
     # Setup: create a checklist item for a previous date

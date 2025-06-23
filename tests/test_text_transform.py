@@ -1,5 +1,11 @@
 import pytest
-from text_transform import transform_text, TransformChoice, handle_text_transform_command, InvalidInputError
+
+from text_transform import (
+    InvalidInputError,
+    TransformChoice,
+    handle_text_transform_command,
+    transform_text,
+)
 
 
 def test_alternating_case():

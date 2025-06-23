@@ -1,9 +1,11 @@
 import datetime
-import pytz
-from models import orm_db, DailyChecklist, DailyChecklistCheck
-from log import log_event, get_ray_id
-from typing import Tuple, List
+from typing import List, Tuple
+
 import discord
+import pytz
+
+from log import get_ray_id, log_event
+from models import DailyChecklist, DailyChecklistCheck, orm_db
 
 
 def get_current_day() -> datetime.date:

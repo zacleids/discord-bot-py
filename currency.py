@@ -1,10 +1,12 @@
+import datetime
+import json
+
 import pytz
 import requests
-import datetime
+
+from log import get_ray_id, log_event
 from models import CurrencyRate, orm_db
 from utils import format_number
-from log import log_event, get_ray_id
-import json
 
 
 def utcnow():

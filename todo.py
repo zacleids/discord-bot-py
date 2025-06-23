@@ -1,8 +1,9 @@
 import sqlite3
+
 import discord
 
 from errors import InvalidInputError
-from log import log_event, get_ray_id
+from log import get_ray_id, log_event
 
 DB_NAME = "db/bot.db"
 
@@ -153,7 +154,7 @@ def move_task(user_id: int, old_position: int, new_position: int) -> str:
     tasks = list_tasks(user_id)
     task = tasks[old_position - 1] if tasks and old_position <= len(tasks) else None
     if task:
-        from log import log_event, get_ray_id
+        from log import get_ray_id, log_event
 
         log_event(
             "AUDIT_LOG",

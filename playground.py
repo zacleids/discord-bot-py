@@ -5,20 +5,19 @@ import random
 import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from pytz import timezone, all_timezones
+
+from pytz import all_timezones, timezone
 
 import db.db
-from encode import decode_base64
 import hangman
-from reminder import Reminder
 import time_funcs
 import todo
-
 import utils
 from color import generate_image
 from dice import dice_roll_command
+from encode import decode_base64
 from errors import InvalidInputError
-
+from reminder import Reminder
 
 phrase = "you're a cute kitty!"
 guessed_letters = "hgtofijk"

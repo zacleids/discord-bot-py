@@ -1,6 +1,7 @@
 import pytest
-from rps import play_rock_paper_scissors
+
 from errors import InvalidInputError
+from rps import play_rock_paper_scissors
 
 
 def test_play_rock_paper_scissors_valid_choices():

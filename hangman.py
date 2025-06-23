@@ -1,8 +1,10 @@
-from models import HangmanGame
 import random
 import re
 from datetime import datetime
+
 import emoji
+
+from models import HangmanGame
 
 EIGHT_HOURS = 8 * 60 * 60
 

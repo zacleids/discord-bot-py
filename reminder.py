@@ -1,7 +1,9 @@
 from datetime import datetime
-from log import log_event, get_ray_id
-from models import Reminder
+
 import discord
+
+from log import get_ray_id, log_event
+from models import Reminder
 
 
 class EditReminderModal(discord.ui.Modal, title="Edit Reminder"):
