@@ -23,16 +23,6 @@ build-backend = "poetry.core.masonry.api"
 line-length = 140
 target-version = ['py310']
 
-[tool.pylint."messages control"]
-ignore = ["setup.py", "__init__.py"]
-disable = "all"
-enable = [
-  "empty-docstring",
-  "missing-class-docstring",
-  "missing-function-docstring",
-  "missing-module-docstring"
-]
-
 [tool.isort]
 profile = "black"
 known_first_party = ["discord_bot_py"] 
