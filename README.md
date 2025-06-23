@@ -44,11 +44,11 @@ black --check .
 isort --check-only .
 ```
 
-- `flake8` checks for general linting issues.
-- `black --check` checks code formatting (auto-format with `black .`).
-- `isort --check-only` checks import order (auto-fix with `isort .`).
+- `flake8` checks for general linting issues. ([flake8](https://github.com/pycqa/flake8))
+- `black --check` checks code formatting (auto-format with `black .`). ([black](https://github.com/psf/black))
+- `isort --check-only` checks import order (auto-fix with `isort .`). ([isort](https://github.com/PyCQA/isort))
 
 
 ### Links used:
-https://fallendeity.github.io/discord.py-masterclass/slash-commands/#slash-command-parameters
-https://www.tweag.io/blog/2023-04-04-python-monorepo-1/
+- https://fallendeity.github.io/discord.py-masterclass/slash-commands/#slash-command-parameters
+- https://www.tweag.io/blog/2023-04-04-python-monorepo-1/
