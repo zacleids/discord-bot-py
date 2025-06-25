@@ -1,8 +1,8 @@
 import os
 import sqlite3
 
-from db.db import create_dbs, orm_db
-from time_funcs import WorldClock
+from shared.db.db import create_dbs, orm_db
+from shared.time_funcs import WorldClock
 
 # Get the absolute path of the db file relative to the script's location
 script_dir = os.path.dirname(os.path.abspath(__file__))
