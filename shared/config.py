@@ -35,7 +35,9 @@ class Config:
         # Database configuration
         self.db_name = f"{db_prefix}.db"
         self.db_orm_name = f"{db_prefix}_orm.db"
-        db_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db")
+        # Always use the shared/db directory relative to the project root
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        db_dir = os.path.join(project_root, "shared", "db")
         os.makedirs(db_dir, exist_ok=True)
 
         self.db_path = os.path.join(db_dir, self.db_name)

@@ -2,15 +2,14 @@ import sqlite3
 
 import discord
 
+from .config import config
 from .errors import InvalidInputError
 from .log import get_ray_id, log_event
-
-DB_NAME = "db/bot.db"
 
 
 def create_db():
     """Create the database and the tasks table if they don't exist."""
-    connection = sqlite3.connect(DB_NAME)
+    connection = sqlite3.connect(config.db_path)
     cursor = connection.cursor()
 
     cursor.execute(
@@ -29,7 +28,7 @@ def create_db():
 
 
 def add_task(user_id: int, task: str, position: int = None):
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(config.db_path)
     c = conn.cursor()
 
     # Get total task count for the user
@@ -67,7 +66,7 @@ def remove_task(user_id: int, position: int) -> str:
             level="info",
         )
 
-    connection = sqlite3.connect(DB_NAME)
+    connection = sqlite3.connect(config.db_path)
     cursor = connection.cursor()
 
     # Check if task exists at the given position
@@ -92,7 +91,7 @@ def remove_task(user_id: int, position: int) -> str:
 
 
 def get_task(user_id: int, position: int) -> str:
-    connection = sqlite3.connect(DB_NAME)
+    connection = sqlite3.connect(config.db_path)
     cursor = connection.cursor()
 
     cursor.execute("SELECT task FROM todo_list WHERE user_id = ? AND order_index = ?", (user_id, position))
@@ -122,7 +121,7 @@ def update_task(user_id: int, position: int, new_task: str) -> None:
             level="info",
         )
 
-    connection = sqlite3.connect(DB_NAME)
+    connection = sqlite3.connect(config.db_path)
     cursor = connection.cursor()
 
     cursor.execute("UPDATE todo_list SET task = ? WHERE user_id = ? AND order_index = ?", (new_task, user_id, position))
@@ -131,7 +130,7 @@ def update_task(user_id: int, position: int, new_task: str) -> None:
 
 
 def list_tasks(user_id: int):
-    connection = sqlite3.connect(DB_NAME)
+    connection = sqlite3.connect(config.db_path)
     cursor = connection.cursor()
 
     cursor.execute(
@@ -173,7 +172,7 @@ def move_task(user_id: int, old_position: int, new_position: int) -> str:
     if old_position == new_position:
         return "Task is already in that position."
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(config.db_path)
     c = conn.cursor()
 
     # Get the task's ID at old_position
