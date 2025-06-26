@@ -1,13 +1,23 @@
 # discord-bot-py
 
-## Running discord-bot
+## Running discord-bot and/or web backend
 
-In order to run the discord bot, you need a .env file with the `DISCORD_TOKEN` filled out. You can copy the `.env.example` file to `.env` and add your bot token that has access to a discord server of your choice.
+In order to run the discord bot or web backend, you need a .env file with the `DISCORD_TOKEN` filled out. You can copy the `.env.example` file to `.env` and add your bot token that has access to a discord server of your choice.
 
-Once the `DISCORD_TOKEN` has been added, you can run the bot with
-```sh
-python run.py
-```
+Once the `DISCORD_TOKEN` has been added, you can run the bot, web backend, or both:
+
+- To run the Discord bot only:
+  ```sh
+  python run.py --bot
+  ```
+- To run the Flask web backend only:
+  ```sh
+  python run.py --web
+  ```
+- To run both the Discord bot and web backend together:
+  ```sh
+  python run.py --bot --web
+  ```
 
 ## Development Setup
 

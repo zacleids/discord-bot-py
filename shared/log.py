@@ -3,11 +3,14 @@ import inspect
 import json
 import logging
 import sys
+import time
 import uuid
+from functools import wraps
 from logging.handlers import RotatingFileHandler
 from typing import Any, Awaitable, Callable
 
 import discord
+from flask import jsonify, request
 
 from .config import config
 
@@ -164,8 +167,6 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
 
     @functools.wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> None:
-        import time
-
         # Extract the interaction object
         interaction = None
         for arg in args:
@@ -254,6 +255,82 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
 
     wrapper.__signature__ = inspect.signature(func)
     return wrapper
+
+
+def log_and_send_json_response(response, *, status_code=200, extra_context=None):
+    """
+    Helper to log outgoing Flask JSON responses and return the response.
+    Logs the response data, status code, and ray id.
+    """
+    ray_id = get_ray_id()
+    log_context = {
+        "ray_id": ray_id,
+        "event": "OUTGOING_WEB_RESPONSE",
+        "method": request.method,
+        "url": request.url,
+        "path": request.path,
+        "remote_addr": request.remote_addr,
+        "status_code": status_code,
+        "response": response,
+    }
+    if extra_context:
+        log_context.update(extra_context)
+    log_event("OUTGOING_WEB_RESPONSE", log_context)
+    return jsonify(response), status_code
+
+
+def log_request(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        ray_id = get_ray_id()
+        log_context = {
+            "ray_id": ray_id,
+            "event": "INCOMING_WEB_REQUEST",
+            "method": request.method,
+            "url": request.url,
+            "path": request.path,
+            "remote_addr": request.remote_addr,
+            "user_agent": request.headers.get("User-Agent"),
+            "headers": dict(request.headers),
+            "args": request.args.to_dict(),
+            "form": request.form.to_dict(),
+            "json": request.get_json(silent=True),
+            "client_ip": request.environ.get("HTTP_X_FORWARDED_FOR", request.remote_addr),
+        }
+        log_event("INCOMING_WEB_REQUEST", log_context)
+        start_time = time.perf_counter()
+        try:
+            return f(*args, **kwargs)
+        finally:
+            exec_time = time.perf_counter() - start_time
+            log_event(
+                "EXECUTION_TIME",
+                {
+                    "ray_id": ray_id,
+                    "event": "WEB_REQUEST_EXECUTION_TIME",
+                    "method": request.method,
+                    "url": request.url,
+                    "path": request.path,
+                    "exec_time": exec_time,
+                },
+            )
+            if exec_time > config.performance_warning_threshold:
+                log_event(
+                    "PERFORMANCE_WARNING",
+                    {
+                        "ray_id": ray_id,
+                        "event": "PERFORMANCE_WARNING",
+                        "command_type": "web_request",
+                        "exec_time": exec_time,
+                        "performance_warning_threshold": config.performance_warning_threshold,
+                        "method": request.method,
+                        "url": request.url,
+                        "path": request.path,
+                    },
+                    level="warning",
+                )
+
+    return decorated_function
 
 
 # After logger setup, flush any buffered config log events
