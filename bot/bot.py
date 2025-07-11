@@ -1,11 +1,7 @@
 import asyncio
-import atexit
-import logging
 import os
 import platform
 import random
-import signal
-import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -68,9 +64,6 @@ tree.add_command(daily_command_group)
 
 # Ensure the database and tasks table are set up
 db.create_dbs()
-log_event(
-    "DB_READY", {"event": "DB_READY", "db_path": config.db_path, "db_orm_path": config.db_orm_path, "ray_id": get_ray_id()}, level="info"
-)
 
 
 @client.event
@@ -938,10 +931,6 @@ async def daily_history_slash_command(interaction: discord.Interaction, date: st
     await log_and_send_message_interaction(interaction, response)
 
 
-# --- Startup log and debug print ---
-log_event("STARTUP", {"event": "STARTUP", "message": "Bot is starting up and logging is configured."})
-
-
 # https://fallendeity.github.io/discord.py-masterclass/slash-commands/#error-handling-and-checks
 @tree.error
 async def on_error(interaction: discord.Interaction[discord.Client], error: discord.app_commands.AppCommandError | Exception) -> None:
@@ -1185,21 +1174,16 @@ async def on_ready_health():
         health_check.start()
 
 
-def handle_exit(*args):
-    log_event("SHUTDOWN", {"event": "SHUTDOWN", "ray_id": get_ray_id()}, level="info")
-    logging.shutdown()
-    sys.exit(0)
+async def bot_shutdown():
+    log_event("SHUTDOWN_BOT", {"event": "SHUTDOWN", "ray_id": get_ray_id()}, level="info")
+    await client.close()
 
 
-signal.signal(signal.SIGINT, handle_exit)
-signal.signal(signal.SIGTERM, handle_exit)
-
-
-def main():
+def bot_main():
+    # --- Startup log and debug print ---
+    log_event("STARTUP", {"event": "STARTUP", "message": "Bot is starting up and logging is configured."})
     client.run(config.discord_token)
 
 
 if __name__ == "__main__":
-    main()
-# At the end of the file, add shutdown log
-atexit.register(lambda: log_event("SHUTDOWN", {"event": "SHUTDOWN", "ray_id": get_ray_id()}))
+    bot_main()

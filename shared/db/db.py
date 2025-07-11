@@ -1,5 +1,7 @@
 import os
 
+from shared.log import get_ray_id, log_event
+
 from .. import todo
 from ..config import config
 from ..models import (
@@ -26,3 +28,8 @@ def create_dbs():
     print(f"Connecting to DB: {config.db_orm_path}")
     orm_db.connect()
     orm_db.create_tables([HangmanGame, Reminder, WorldClock, DailyChecklist, DailyChecklistCheck, CurrencyRate])
+    log_event(
+        "DB_READY",
+        {"event": "DB_READY", "db_path": config.db_path, "db_orm_path": config.db_orm_path, "ray_id": get_ray_id()},
+        level="info",
+    )

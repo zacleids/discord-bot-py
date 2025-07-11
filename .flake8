@@ -5,7 +5,10 @@ exclude =
     temp/*,
     migrations/*,
     scripts/*,
-    .venv
+    .venv,
+    web/frontend/node_modules,
+    web/frontend/dist,
+    web/frontend/build,
 
 # required for compatibility with Black:
 extend-ignore = E203
