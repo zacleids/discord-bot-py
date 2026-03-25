@@ -21,11 +21,55 @@ Once the `DISCORD_TOKEN` has been added, you can run the bot, web backend, or bo
 
 ## Development Setup
 
+### Python virtual environment (.venv)
+
+It's recommended to create and use a project-local virtual environment named `.venv` to keep dependencies isolated.
+
+Create the environment (cross-platform):
+
+```sh
+python -m venv .venv
+```
+
+Activate the environment:
+
+- Bash (including WSL or Git Bash on Windows):
+
+```sh
+source .venv/Scripts/activate    # on Windows Git Bash or WSL
+# or
+source .venv/bin/activate        # macOS / Linux
+```
+
+- PowerShell (Windows):
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+- Command Prompt (cmd.exe) on Windows:
+
+```cmd
+.\.venv\Scripts\activate.bat
+```
+
+After activating, upgrade pip and install dependencies:
+
+```sh
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+Deactivate the environment when you're done if needed:
+
+```sh
+deactivate
+```
+
 This project uses [pre-commit](https://pre-commit.com/) hooks for formatting and linting.
 To set up:
 
 ```sh
-pip install pre-commit
 pre-commit install
 ```
 
