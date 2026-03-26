@@ -6,7 +6,6 @@ from peewee_migrate import Router
 
 from shared.log import get_ray_id, log_event
 
-from .. import todo
 from ..config import config
 from ..models import orm_db
 
@@ -21,8 +20,6 @@ def run_migrations(database: pw.Database):
 
 
 def create_dbs():
-    todo.create_db()
-
     # Ensure DB file exists
     if not os.path.exists(config.db_orm_path):
         open(config.db_orm_path, "a").close()
@@ -31,7 +28,7 @@ def create_dbs():
         print("DB already exists")
 
     print(f"Connecting to DB: {config.db_orm_path}")
-    orm_db.connect()
+    orm_db.connect(reuse_if_open=True)
     run_migrations(orm_db)
     log_event(
         "DB_READY",
