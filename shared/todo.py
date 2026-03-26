@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Sequence
 
 import discord
@@ -14,18 +15,22 @@ def create_db():
     orm_db.connect(reuse_if_open=True)
 
 
-def _get_user_tasks(user_id: int) -> list[TodoItem]:
-    return list(TodoItem.select().where(TodoItem.user_id == user_id).order_by(TodoItem.order_index, TodoItem.id))
+def _active_scope(user_id: int, guild_id: int):
+    return (TodoItem.user_id == user_id) & (TodoItem.guild_id == guild_id) & TodoItem.completed_at.is_null()
 
 
-def _get_task_by_position(user_id: int, position: int) -> TodoItem | None:
+def _get_user_tasks(user_id: int, guild_id: int) -> list[TodoItem]:
+    return list(TodoItem.select().where(_active_scope(user_id, guild_id)).order_by(TodoItem.order_index, TodoItem.id))
+
+
+def _get_task_by_position(user_id: int, guild_id: int, position: int) -> TodoItem | None:
     if position < 1:
         return None
-    return TodoItem.select().where(TodoItem.user_id == user_id, TodoItem.order_index == position).order_by(TodoItem.id).first()
+    return TodoItem.select().where(_active_scope(user_id, guild_id), TodoItem.order_index == position).order_by(TodoItem.id).first()
 
 
-def add_task(user_id: int, task: str, position: int = None):
-    task_count = TodoItem.select().where(TodoItem.user_id == user_id).count()
+def add_task(user_id: int, task: str, position: int = None, guild_id: int = 0):
+    task_count = TodoItem.select().where(_active_scope(user_id, guild_id)).count()
 
     if position is None or position < 1 or position > task_count + 1:
         position = task_count + 1
@@ -33,14 +38,14 @@ def add_task(user_id: int, task: str, position: int = None):
     with orm_db.atomic():
         (
             TodoItem.update({TodoItem.order_index: TodoItem.order_index + 1})
-            .where(TodoItem.user_id == user_id, TodoItem.order_index >= position)
+            .where(_active_scope(user_id, guild_id), TodoItem.order_index >= position)
             .execute()
         )
-        return TodoItem.create(user_id=user_id, task=task, order_index=position)
+        return TodoItem.create(user_id=user_id, guild_id=guild_id, task=task, order_index=position)
 
 
-def remove_task(user_id: int, position: int) -> str:
-    task = _get_task_by_position(user_id, position)
+def remove_task(user_id: int, position: int, guild_id: int = 0) -> str:
+    task = _get_task_by_position(user_id, guild_id, position)
     if task:
         log_event(
             "AUDIT_LOG",
@@ -59,23 +64,25 @@ def remove_task(user_id: int, position: int) -> str:
 
     removed_task = task.task
     with orm_db.atomic():
-        task.delete_instance()
+        task.completed_at = datetime.datetime.now()
+        task.order_index = -1
+        task.save()
         (
             TodoItem.update({TodoItem.order_index: TodoItem.order_index - 1})
-            .where(TodoItem.user_id == user_id, TodoItem.order_index > position)
+            .where(_active_scope(user_id, guild_id), TodoItem.order_index > position)
             .execute()
         )
 
     return f"Task {position} removed: {removed_task}"
 
 
-def get_task(user_id: int, position: int) -> str:
-    task = _get_task_by_position(user_id, position)
+def get_task(user_id: int, position: int, guild_id: int = 0) -> str:
+    task = _get_task_by_position(user_id, guild_id, position)
     return task.task if task else None
 
 
-def update_task(user_id: int, position: int, new_task: str) -> None:
-    task = _get_task_by_position(user_id, position)
+def update_task(user_id: int, position: int, new_task: str, guild_id: int = 0) -> None:
+    task = _get_task_by_position(user_id, guild_id, position)
     if task:
         log_event(
             "AUDIT_LOG",
@@ -95,12 +102,12 @@ def update_task(user_id: int, position: int, new_task: str) -> None:
         task.save()
 
 
-def list_tasks(user_id: int):
-    return _get_user_tasks(user_id)
+def list_tasks(user_id: int, guild_id: int = 0):
+    return _get_user_tasks(user_id, guild_id)
 
 
-def move_task(user_id: int, old_position: int, new_position: int) -> str:
-    tasks = list_tasks(user_id)
+def move_task(user_id: int, old_position: int, new_position: int, guild_id: int = 0) -> str:
+    tasks = list_tasks(user_id, guild_id)
     task = tasks[old_position - 1] if tasks and old_position <= len(tasks) else None
     if task:
         log_event(
@@ -130,7 +137,7 @@ def move_task(user_id: int, old_position: int, new_position: int) -> str:
             (
                 TodoItem.update({TodoItem.order_index: TodoItem.order_index - 1})
                 .where(
-                    TodoItem.user_id == user_id,
+                    _active_scope(user_id, guild_id),
                     TodoItem.order_index > old_position,
                     TodoItem.order_index <= new_position,
                 )
@@ -140,7 +147,7 @@ def move_task(user_id: int, old_position: int, new_position: int) -> str:
             (
                 TodoItem.update({TodoItem.order_index: TodoItem.order_index + 1})
                 .where(
-                    TodoItem.user_id == user_id,
+                    _active_scope(user_id, guild_id),
                     TodoItem.order_index >= new_position,
                     TodoItem.order_index < old_position,
                 )
@@ -166,7 +173,7 @@ def get_tasks_response_str(tasks) -> str:
     return f"**Todo List:**\n```Order | Task\n{'-' * 30}\n{tasks_str}```"
 
 
-def handle_todo_command(args: list[str], user: discord.User, mentions: list[discord.User]):
+def handle_todo_command(args: list[str], user: discord.User, mentions: list[discord.User], guild_id: int = 0):
     result = None
     if not args:
         result = "Please provide a subcommand (add, remove, list)."
@@ -188,7 +195,7 @@ def handle_todo_command(args: list[str], user: discord.User, mentions: list[disc
                     result = "Please provide a task to add."
                 else:
                     task = " ".join(sub_args)
-                    add_task(user_id, task)
+                    add_task(user_id, task, guild_id=guild_id)
                     result = f"Task added: {task}"
 
             case "remove":
@@ -198,10 +205,10 @@ def handle_todo_command(args: list[str], user: discord.User, mentions: list[disc
                     result = "Please provide the ID of the task to remove."
                 else:
                     position = int(sub_args[0])
-                    result = remove_task(user_id, position)
+                    result = remove_task(user_id, position, guild_id)
 
             case "list":
-                tasks = list_tasks(user_id)
+                tasks = list_tasks(user_id, guild_id)
                 if tasks:
                     result = get_tasks_response_str(tasks)
                 else:
@@ -212,9 +219,10 @@ def handle_todo_command(args: list[str], user: discord.User, mentions: list[disc
 
 
 class EditTaskModal(discord.ui.Modal, title="Edit Task"):
-    def __init__(self, user_id: int, position: int, existing_task: str):
+    def __init__(self, user_id: int, guild_id: int, position: int, existing_task: str):
         super().__init__()
         self.user_id = user_id
+        self.guild_id = guild_id
         self.position = position
 
         # Prefill the text field with the existing task
@@ -223,5 +231,5 @@ class EditTaskModal(discord.ui.Modal, title="Edit Task"):
 
     async def on_submit(self, interaction: discord.Interaction):
         new_task = self.task_input.value
-        update_task(self.user_id, self.position, new_task)
+        update_task(self.user_id, self.position, new_task, self.guild_id)
         await interaction.response.send_message(f"Task {self.position} updated successfully!")
