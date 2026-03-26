@@ -63,3 +63,15 @@ class WorldClock(BaseModel):
     timezone_str = CharField()
     label = CharField(null=True)
     created_at = DateTimeField(default=datetime.datetime.now)
+
+
+class TodoItem(BaseModel):
+    user_id = IntegerField()
+    guild_id = IntegerField(null=True)  # Optional guild_id for future expansion
+    task = TextField()
+    order_index = IntegerField()
+    created_at = DateTimeField(default=datetime.datetime.now)
+    completed_at = DateTimeField(null=True)  # Optional completed_at for future expansion
+
+    class Meta:
+        table_name = "todo_list"

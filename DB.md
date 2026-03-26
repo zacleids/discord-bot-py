@@ -24,6 +24,10 @@ All commands below assume the virtual environment is active and are run from the
 pw_migrate migrate --database sqlite:///shared/db/bot_orm.db --directory migrations
 ```
 
+```bash
+pw_migrate migrate --database sqlite:///shared/db/test_orm.db --directory migrations
+```
+
 ### List Migrations
 
 Shows which migrations have been applied and which are pending:

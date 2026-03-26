@@ -1,57 +1,46 @@
-import sqlite3
+from __future__ import annotations
+
+from collections.abc import Sequence
 
 import discord
 
-from .config import config
 from .errors import InvalidInputError
 from .log import get_ray_id, log_event
+from .models import TodoItem, orm_db
 
 
 def create_db():
-    """Create the database and the tasks table if they don't exist."""
-    connection = sqlite3.connect(config.db_path)
-    cursor = connection.cursor()
+    """Retained for backward compatibility; todo now lives in the ORM database."""
+    orm_db.connect(reuse_if_open=True)
 
-    cursor.execute(
-        """
-    CREATE TABLE IF NOT EXISTS todo_list (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        task TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        order_index INTEGER NOT NULL
-    )
-    """
-    )
-    connection.commit()
-    connection.close()
+
+def _get_user_tasks(user_id: int) -> list[TodoItem]:
+    return list(TodoItem.select().where(TodoItem.user_id == user_id).order_by(TodoItem.order_index, TodoItem.id))
+
+
+def _get_task_by_position(user_id: int, position: int) -> TodoItem | None:
+    if position < 1:
+        return None
+    return TodoItem.select().where(TodoItem.user_id == user_id, TodoItem.order_index == position).order_by(TodoItem.id).first()
 
 
 def add_task(user_id: int, task: str, position: int = None):
-    conn = sqlite3.connect(config.db_path)
-    c = conn.cursor()
+    task_count = TodoItem.select().where(TodoItem.user_id == user_id).count()
 
-    # Get total task count for the user
-    c.execute("SELECT COUNT(*) FROM todo_list WHERE user_id = ?", (user_id,))
-    task_count = c.fetchone()[0]
-
-    # If position is not provided or out of range, set it to the last position
-    if position is None or position > task_count + 1:
+    if position is None or position < 1 or position > task_count + 1:
         position = task_count + 1
 
-    # Shift all tasks at or below the position down by 1
-    c.execute("UPDATE todo_list SET order_index = order_index + 1 WHERE user_id = ? AND order_index >= ?", (user_id, position))
-
-    # Insert the new task at the specified position
-    c.execute("INSERT INTO todo_list (user_id, task, order_index) VALUES (?, ?, ?)", (user_id, task, position))
-
-    conn.commit()
-    conn.close()
+    with orm_db.atomic():
+        (
+            TodoItem.update({TodoItem.order_index: TodoItem.order_index + 1})
+            .where(TodoItem.user_id == user_id, TodoItem.order_index >= position)
+            .execute()
+        )
+        return TodoItem.create(user_id=user_id, task=task, order_index=position)
 
 
 def remove_task(user_id: int, position: int) -> str:
-    tasks = list_tasks(user_id)
-    task = tasks[position - 1] if tasks and position <= len(tasks) else None
+    task = _get_task_by_position(user_id, position)
     if task:
         log_event(
             "AUDIT_LOG",
@@ -65,103 +54,62 @@ def remove_task(user_id: int, position: int) -> str:
             },
             level="info",
         )
-
-    connection = sqlite3.connect(config.db_path)
-    cursor = connection.cursor()
-
-    # Check if task exists at the given position
-    cursor.execute("SELECT id, task FROM todo_list WHERE user_id = ? AND order_index = ?", (user_id, position))
-    task = cursor.fetchone()
     if not task:
-        connection.close()
         return "Task not found."
 
-    task_id = task[0]
+    removed_task = task.task
+    with orm_db.atomic():
+        task.delete_instance()
+        (
+            TodoItem.update({TodoItem.order_index: TodoItem.order_index - 1})
+            .where(TodoItem.user_id == user_id, TodoItem.order_index > position)
+            .execute()
+        )
 
-    # Delete the task
-    cursor.execute("DELETE FROM todo_list WHERE id = ?", (task_id,))
-
-    # Shift all tasks above it up by 1
-    cursor.execute("UPDATE todo_list SET order_index = order_index - 1 WHERE user_id = ? AND order_index > ?", (user_id, position))
-
-    connection.commit()
-    connection.close()
-
-    return f"Task {position} removed: {task[1]}"
+    return f"Task {position} removed: {removed_task}"
 
 
 def get_task(user_id: int, position: int) -> str:
-    connection = sqlite3.connect(config.db_path)
-    cursor = connection.cursor()
-
-    cursor.execute("SELECT task FROM todo_list WHERE user_id = ? AND order_index = ?", (user_id, position))
-    task = cursor.fetchone()
-
-    connection.close()
-    return task[0] if task else None
+    task = _get_task_by_position(user_id, position)
+    return task.task if task else None
 
 
 def update_task(user_id: int, position: int, new_task: str) -> None:
-    tasks = list_tasks(user_id)
-    task = tasks[position - 1] if tasks and position <= len(tasks) else None
+    task = _get_task_by_position(user_id, position)
     if task:
-        old_task_val = getattr(task, "task", str(task))
         log_event(
             "AUDIT_LOG",
             {
                 "event": "AUDIT_LOG",
                 "action": "todo_edit",
                 "user_id": user_id,
-                "task_id": getattr(task, "id", None),
-                "before": {"task": old_task_val},
+                "task_id": task.id,
+                "before": {"task": task.task},
                 "after": {"task": new_task},
                 "position": position,
                 "ray_id": get_ray_id(),
             },
             level="info",
         )
-
-    connection = sqlite3.connect(config.db_path)
-    cursor = connection.cursor()
-
-    cursor.execute("UPDATE todo_list SET task = ? WHERE user_id = ? AND order_index = ?", (new_task, user_id, position))
-    connection.commit()
-    connection.close()
+        task.task = new_task
+        task.save()
 
 
 def list_tasks(user_id: int):
-    connection = sqlite3.connect(config.db_path)
-    cursor = connection.cursor()
-
-    cursor.execute(
-        """
-        SELECT order_index, task
-        FROM todo_list
-        WHERE user_id = ?
-        ORDER BY order_index ASC
-    """,
-        (user_id,),
-    )
-
-    tasks = cursor.fetchall()
-    connection.close()
-
-    return tasks
+    return _get_user_tasks(user_id)
 
 
 def move_task(user_id: int, old_position: int, new_position: int) -> str:
     tasks = list_tasks(user_id)
     task = tasks[old_position - 1] if tasks and old_position <= len(tasks) else None
     if task:
-        from log import get_ray_id, log_event
-
         log_event(
             "AUDIT_LOG",
             {
                 "event": "AUDIT_LOG",
                 "action": "todo_move",
                 "user_id": user_id,
-                "task_id": getattr(task, "id", None),
+                "task_id": task.id,
                 "before": {"position": old_position},
                 "after": {"position": new_position},
                 "ray_id": get_ray_id(),
@@ -172,34 +120,44 @@ def move_task(user_id: int, old_position: int, new_position: int) -> str:
     if old_position == new_position:
         return "Task is already in that position."
 
-    conn = sqlite3.connect(config.db_path)
-    c = conn.cursor()
-
-    # Get the task's ID at old_position
-    c.execute("SELECT id FROM todo_list WHERE user_id = ? AND order_index = ?", (user_id, old_position))
-    task = c.fetchone()
-    if not task:
+    task_count = len(tasks)
+    if old_position < 1 or old_position > task_count or new_position < 1 or new_position > task_count:
         return "Task not found."
 
-    task_id = task[0]
+    item_to_move = task
+    with orm_db.atomic():
+        if old_position < new_position:
+            (
+                TodoItem.update({TodoItem.order_index: TodoItem.order_index - 1})
+                .where(
+                    TodoItem.user_id == user_id,
+                    TodoItem.order_index > old_position,
+                    TodoItem.order_index <= new_position,
+                )
+                .execute()
+            )
+        else:
+            (
+                TodoItem.update({TodoItem.order_index: TodoItem.order_index + 1})
+                .where(
+                    TodoItem.user_id == user_id,
+                    TodoItem.order_index >= new_position,
+                    TodoItem.order_index < old_position,
+                )
+                .execute()
+            )
 
-    # Remove gap where the task was
-    c.execute("UPDATE todo_list SET order_index = order_index - 1 WHERE user_id = ? AND order_index > ?", (user_id, old_position))
+        item_to_move.order_index = new_position
+        item_to_move.save()
 
-    # Make space at the new position
-    c.execute("UPDATE todo_list SET order_index = order_index + 1 WHERE user_id = ? AND order_index >= ?", (user_id, new_position))
-
-    # Move the task
-    c.execute("UPDATE todo_list SET order_index = ? WHERE id = ?", (new_position, task_id))
-
-    conn.commit()
-    conn.close()
     return f"Task moved to position {new_position}."
 
 
 def format_task(task) -> str:
     #  task[0]:<5 ensures the Order is left-aligned and takes up 5 characters.
-    return f"{task[0]:<5} | {task[1]}"
+    if isinstance(task, Sequence) and not isinstance(task, str):
+        return f"{task[0]:<5} | {task[1]}"
+    return f"{task.order_index:<5} | {task.task}"
 
 
 def get_tasks_response_str(tasks) -> str:
