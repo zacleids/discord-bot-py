@@ -277,7 +277,9 @@ async def on_message(message: discord.Message):
                 case "rps" | "rock" | "paper" | "scissors":
                     result = rps.play_rock_paper_scissors(args)
                 case "todo":
-                    result = todo.handle_todo_command(args, message.author, message.mentions)
+                    # Store private todo items under guild_id=0 when command is used in DMs.
+                    todo_guild_id = message.guild.id if message.guild else 0
+                    result = todo.handle_todo_command(args, message.author, message.mentions, todo_guild_id)
                 case "color":
                     result, files = color.handle_color_command(args)
                 case "clock" | "clocks":
@@ -556,7 +558,8 @@ async def todo_add_slash_command(
     interaction: discord.Interaction, task: str, position: discord.app_commands.Range[int, 1, 100] = None, user: discord.User = None
 ):
     user = user or interaction.user  # Default to the interaction user if no mention
-    todo.add_task(user.id, task, position)  # Add the task to the database with the user ID
+    todo_guild_id = interaction.guild_id if interaction.guild_id is not None else 0
+    todo.add_task(user.id, task, position, todo_guild_id)  # Add the task to the database with the user ID
     result = f"Task added: {task}"
     await log_and_send_message_interaction(interaction, result)
 
@@ -566,7 +569,8 @@ async def todo_add_slash_command(
 @log_interaction
 async def todo_list_slash_command(interaction: discord.Interaction, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
-    tasks = todo.list_tasks(user.id)  # Get tasks for the user
+    todo_guild_id = interaction.guild_id if interaction.guild_id is not None else 0
+    tasks = todo.list_tasks(user.id, todo_guild_id)  # Get tasks for the user
     if tasks:
         response = todo.get_tasks_response_str(tasks)
         await log_and_send_message_interaction(interaction, response)
@@ -579,7 +583,8 @@ async def todo_list_slash_command(interaction: discord.Interaction, user: discor
 @log_interaction
 async def todo_remove_slash_command(interaction: discord.Interaction, position: int, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
-    response = todo.remove_task(user.id, position)
+    todo_guild_id = interaction.guild_id if interaction.guild_id is not None else 0
+    response = todo.remove_task(user.id, position, todo_guild_id)
     await log_and_send_message_interaction(interaction, response)
 
 
@@ -588,7 +593,8 @@ async def todo_remove_slash_command(interaction: discord.Interaction, position: 
 @log_interaction
 async def todo_move_slash_command(interaction: discord.Interaction, old_position: int, new_position: int, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
-    result = todo.move_task(user.id, old_position, new_position)
+    todo_guild_id = interaction.guild_id if interaction.guild_id is not None else 0
+    result = todo.move_task(user.id, old_position, new_position, todo_guild_id)
     await log_and_send_message_interaction(interaction, result)
 
 
@@ -598,14 +604,15 @@ async def todo_move_slash_command(interaction: discord.Interaction, old_position
 async def todo_edit_slash_command(interaction: discord.Interaction, position: int, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
     user_id = user.id
-    existing_task = todo.get_task(user_id, position)
+    todo_guild_id = interaction.guild_id if interaction.guild_id is not None else 0
+    existing_task = todo.get_task(user_id, position, todo_guild_id)
 
     if existing_task is None:
         await log_and_send_message_interaction(interaction, "Task not found.")
         return
 
     # Send the modal
-    await interaction.response.send_modal(todo.EditTaskModal(user_id, position, existing_task))
+    await interaction.response.send_modal(todo.EditTaskModal(user_id, todo_guild_id, position, existing_task))
 
 
 # Subcommand `/clock list`
