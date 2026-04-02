@@ -15,21 +15,22 @@ def create_db():
     orm_db.connect(reuse_if_open=True)
 
 
-def _active_scope(user_id: int, guild_id: int):
-    return (TodoItem.user_id == user_id) & (TodoItem.guild_id == guild_id) & TodoItem.completed_at.is_null()
+def _active_scope(user_id: int, guild_id: int | None):
+    guild_filter = TodoItem.guild_id.is_null() if guild_id is None else (TodoItem.guild_id == guild_id)
+    return (TodoItem.user_id == user_id) & guild_filter & TodoItem.completed_at.is_null()
 
 
-def _get_user_tasks(user_id: int, guild_id: int) -> list[TodoItem]:
+def _get_user_tasks(user_id: int, guild_id: int | None) -> list[TodoItem]:
     return list(TodoItem.select().where(_active_scope(user_id, guild_id)).order_by(TodoItem.order_index, TodoItem.id))
 
 
-def _get_task_by_position(user_id: int, guild_id: int, position: int) -> TodoItem | None:
+def _get_task_by_position(user_id: int, guild_id: int | None, position: int) -> TodoItem | None:
     if position < 1:
         return None
     return TodoItem.select().where(_active_scope(user_id, guild_id), TodoItem.order_index == position).order_by(TodoItem.id).first()
 
 
-def add_task(user_id: int, task: str, position: int = None, guild_id: int = 0):
+def add_task(user_id: int, task: str, position: int = None, guild_id: int | None = None):
     task_count = TodoItem.select().where(_active_scope(user_id, guild_id)).count()
 
     if position is None or position < 1 or position > task_count + 1:
@@ -44,7 +45,7 @@ def add_task(user_id: int, task: str, position: int = None, guild_id: int = 0):
         return TodoItem.create(user_id=user_id, guild_id=guild_id, task=task, order_index=position)
 
 
-def remove_task(user_id: int, position: int, guild_id: int = 0) -> str:
+def remove_task(user_id: int, position: int, guild_id: int | None = None) -> str:
     task = _get_task_by_position(user_id, guild_id, position)
     if task:
         log_event(
@@ -76,12 +77,12 @@ def remove_task(user_id: int, position: int, guild_id: int = 0) -> str:
     return f"Task {position} removed: {removed_task}"
 
 
-def get_task(user_id: int, position: int, guild_id: int = 0) -> str:
+def get_task(user_id: int, position: int, guild_id: int | None = None) -> str:
     task = _get_task_by_position(user_id, guild_id, position)
     return task.task if task else None
 
 
-def update_task(user_id: int, position: int, new_task: str, guild_id: int = 0) -> None:
+def update_task(user_id: int, position: int, new_task: str, guild_id: int | None = None) -> None:
     task = _get_task_by_position(user_id, guild_id, position)
     if task:
         log_event(
@@ -102,11 +103,11 @@ def update_task(user_id: int, position: int, new_task: str, guild_id: int = 0) -
         task.save()
 
 
-def list_tasks(user_id: int, guild_id: int = 0):
+def list_tasks(user_id: int, guild_id: int | None = None):
     return _get_user_tasks(user_id, guild_id)
 
 
-def move_task(user_id: int, old_position: int, new_position: int, guild_id: int = 0) -> str:
+def move_task(user_id: int, old_position: int, new_position: int, guild_id: int | None = None) -> str:
     tasks = list_tasks(user_id, guild_id)
     task = tasks[old_position - 1] if tasks and old_position <= len(tasks) else None
     if task:
@@ -173,7 +174,7 @@ def get_tasks_response_str(tasks) -> str:
     return f"**Todo List:**\n```Order | Task\n{'-' * 30}\n{tasks_str}```"
 
 
-def handle_todo_command(args: list[str], user: discord.User, mentions: list[discord.User], guild_id: int = 0):
+def handle_todo_command(args: list[str], user: discord.User, mentions: list[discord.User], guild_id: int | None = None):
     result = None
     if not args:
         result = "Please provide a subcommand (add, remove, list)."
@@ -219,7 +220,7 @@ def handle_todo_command(args: list[str], user: discord.User, mentions: list[disc
 
 
 class EditTaskModal(discord.ui.Modal, title="Edit Task"):
-    def __init__(self, user_id: int, guild_id: int, position: int, existing_task: str):
+    def __init__(self, user_id: int, guild_id: int | None, position: int, existing_task: str):
         super().__init__()
         self.user_id = user_id
         self.guild_id = guild_id

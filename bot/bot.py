@@ -277,16 +277,15 @@ async def on_message(message: discord.Message):
                 case "rps" | "rock" | "paper" | "scissors":
                     result = rps.play_rock_paper_scissors(args)
                 case "todo":
-                    # Store private todo items under guild_id=0 when command is used in DMs.
-                    todo_guild_id = message.guild.id if message.guild else 0
+                    # Use guild_id for guild messages; None for DMs (private todo list).
+                    todo_guild_id = message.guild.id if message.guild else None
                     result = todo.handle_todo_command(args, message.author, message.mentions, todo_guild_id)
                 case "color":
                     result, files = color.handle_color_command(args)
                 case "clock" | "clocks":
-                    # Only use message.guild.id if in a guild, else use the user ID
-                    # This is to support DMs
-                    guild_id = message.guild.id if message.guild else message.author.id
-                    result = time_funcs.handle_world_clock_command(args, guild_id)
+                    guild_id = message.guild.id if message.guild else None
+                    user_id = None if message.guild else message.author.id
+                    result = time_funcs.handle_world_clock_command(args, guild_id, user_id)
                 case "encode":
                     result = encode.handle_encode_decode_command(args, "encode")
                 case "decode":
@@ -558,7 +557,7 @@ async def todo_add_slash_command(
     interaction: discord.Interaction, task: str, position: discord.app_commands.Range[int, 1, 100] = None, user: discord.User = None
 ):
     user = user or interaction.user  # Default to the interaction user if no mention
-    todo_guild_id = interaction.guild_id if interaction.guild_id is not None else 0
+    todo_guild_id = interaction.guild_id
     todo.add_task(user.id, task, position, todo_guild_id)  # Add the task to the database with the user ID
     result = f"Task added: {task}"
     await log_and_send_message_interaction(interaction, result)
@@ -569,7 +568,7 @@ async def todo_add_slash_command(
 @log_interaction
 async def todo_list_slash_command(interaction: discord.Interaction, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
-    todo_guild_id = interaction.guild_id if interaction.guild_id is not None else 0
+    todo_guild_id = interaction.guild_id
     tasks = todo.list_tasks(user.id, todo_guild_id)  # Get tasks for the user
     if tasks:
         response = todo.get_tasks_response_str(tasks)
@@ -583,7 +582,7 @@ async def todo_list_slash_command(interaction: discord.Interaction, user: discor
 @log_interaction
 async def todo_remove_slash_command(interaction: discord.Interaction, position: int, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
-    todo_guild_id = interaction.guild_id if interaction.guild_id is not None else 0
+    todo_guild_id = interaction.guild_id
     response = todo.remove_task(user.id, position, todo_guild_id)
     await log_and_send_message_interaction(interaction, response)
 
@@ -593,7 +592,7 @@ async def todo_remove_slash_command(interaction: discord.Interaction, position: 
 @log_interaction
 async def todo_move_slash_command(interaction: discord.Interaction, old_position: int, new_position: int, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
-    todo_guild_id = interaction.guild_id if interaction.guild_id is not None else 0
+    todo_guild_id = interaction.guild_id
     result = todo.move_task(user.id, old_position, new_position, todo_guild_id)
     await log_and_send_message_interaction(interaction, result)
 
@@ -604,7 +603,7 @@ async def todo_move_slash_command(interaction: discord.Interaction, old_position
 async def todo_edit_slash_command(interaction: discord.Interaction, position: int, user: discord.User = None):
     user = user or interaction.user  # Default to the interaction user if no mention
     user_id = user.id
-    todo_guild_id = interaction.guild_id if interaction.guild_id is not None else 0
+    todo_guild_id = interaction.guild_id
     existing_task = todo.get_task(user_id, position, todo_guild_id)
 
     if existing_task is None:
@@ -619,9 +618,9 @@ async def todo_edit_slash_command(interaction: discord.Interaction, position: in
 @clock_command_group.command(name="list", description="List all clocks in your world clock")
 @log_interaction
 async def clock_list_slash_command(interaction: discord.Interaction):
-    # Use user.id for DMs, guild_id for servers
-    key_id = interaction.guild_id if interaction.guild_id is not None else interaction.user.id
-    tzs = time_funcs.list_timezones(key_id)
+    guild_id = interaction.guild_id
+    user_id = None if interaction.guild_id is not None else interaction.user.id
+    tzs = time_funcs.list_timezones(guild_id, user_id)
     if tzs:
         response = time_funcs.format_tzs_response_str(tzs)
         await log_and_send_message_interaction(interaction, response)
@@ -630,13 +629,15 @@ async def clock_list_slash_command(interaction: discord.Interaction):
 
 
 async def clock_full_list_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
-    existing = [x.timezone_str for x in time_funcs.list_timezones(interaction.guild_id)]
+    user_id = None if interaction.guild_id is not None else interaction.user.id
+    existing = [x.timezone_str for x in time_funcs.list_timezones(interaction.guild_id, user_id)]
     options = [tz for tz in pytz.all_timezones if tz not in existing]
     return [discord.app_commands.Choice(name=option, value=option) for option in options if option.lower().startswith(current.lower())][:25]
 
 
 async def clock_existing_list_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
-    options = [x.timezone_str for x in time_funcs.list_timezones(interaction.guild_id)]
+    user_id = None if interaction.guild_id is not None else interaction.user.id
+    options = [x.timezone_str for x in time_funcs.list_timezones(interaction.guild_id, user_id)]
     return [discord.app_commands.Choice(name=option, value=option) for option in options if option.lower().startswith(current.lower())][:25]
 
 
@@ -645,9 +646,10 @@ async def clock_existing_list_autocomplete(interaction: discord.Interaction, cur
 @discord.app_commands.autocomplete(timezone=clock_full_list_autocomplete)
 @log_interaction
 async def clock_add_slash_command(interaction: discord.Interaction, timezone: str, label: str = None):
-    key_id = interaction.guild_id if interaction.guild_id is not None else interaction.user.id
+    guild_id = interaction.guild_id
+    user_id = None if interaction.guild_id is not None else interaction.user.id
     tz = time_funcs.get_valid_timezone(timezone)
-    result = time_funcs.add_timezone(key_id, tz, label)
+    result = time_funcs.add_timezone(guild_id, user_id, tz, label)
     await log_and_send_message_interaction(interaction, result)
 
 
@@ -656,8 +658,9 @@ async def clock_add_slash_command(interaction: discord.Interaction, timezone: st
 @discord.app_commands.autocomplete(timezone=clock_existing_list_autocomplete)
 @log_interaction
 async def clock_remove_slash_command(interaction: discord.Interaction, timezone: str):
-    key_id = interaction.guild_id if interaction.guild_id is not None else interaction.user.id
-    result = time_funcs.remove_timezone(key_id, timezone)
+    guild_id = interaction.guild_id
+    user_id = None if interaction.guild_id is not None else interaction.user.id
+    result = time_funcs.remove_timezone(guild_id, user_id, timezone)
     await log_and_send_message_interaction(interaction, result)
 
 
@@ -666,8 +669,9 @@ async def clock_remove_slash_command(interaction: discord.Interaction, timezone:
 @discord.app_commands.autocomplete(timezone=clock_existing_list_autocomplete)
 @log_interaction
 async def clock_edit_slash_command(interaction: discord.Interaction, timezone: str):
-    key_id = interaction.guild_id if interaction.guild_id is not None else interaction.user.id
-    existing_tz = time_funcs.get_timezone(key_id, timezone)
+    guild_id = interaction.guild_id
+    user_id = None if interaction.guild_id is not None else interaction.user.id
+    existing_tz = time_funcs.get_timezone(guild_id, user_id, timezone)
 
     if existing_tz is None:
         await log_and_send_message_interaction(interaction, "Timezone not found.")
@@ -675,7 +679,7 @@ async def clock_edit_slash_command(interaction: discord.Interaction, timezone: s
 
     # Send the modal
     await interaction.response.send_modal(
-        time_funcs.EditTimezoneLabelModal(key_id, timezone, existing_tz.label if existing_tz.label else "")
+        time_funcs.EditTimezoneLabelModal(guild_id, user_id, timezone, existing_tz.label if existing_tz.label else "")
     )
 
 
@@ -759,7 +763,7 @@ async def reminder_add_slash_command(
 ):
     user = user or interaction.user  # Default to the interaction user if no mention
     remind_time = datetime.now() + timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
-    guild_id = interaction.guild_id if interaction.guild_id is not None else user.id
+    guild_id = None if is_private else interaction.guild_id
     channel_id = interaction.channel_id if interaction.channel_id is not None else interaction.channel.id
     Reminder.create(
         user_id=user.id, guild_id=guild_id, channel_id=channel_id, message=message, remind_at=remind_time, is_private=is_private
