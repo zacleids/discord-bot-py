@@ -50,7 +50,7 @@ class HangmanGame(BaseModel):
 class Reminder(BaseModel):
     id = IntegerField(primary_key=True)
     user_id = IntegerField()
-    guild_id = IntegerField()
+    guild_id = IntegerField(null=True)
     channel_id = IntegerField()
     message = TextField()
     is_private = BooleanField(default=False)
@@ -59,7 +59,8 @@ class Reminder(BaseModel):
 
 
 class WorldClock(BaseModel):
-    guild_id = IntegerField()
+    guild_id = IntegerField(null=True)
+    user_id = IntegerField(null=True)
     timezone_str = CharField()
     label = CharField(null=True)
     created_at = DateTimeField(default=datetime.datetime.now)
@@ -67,7 +68,7 @@ class WorldClock(BaseModel):
 
 class TodoItem(BaseModel):
     user_id = IntegerField()
-    guild_id = IntegerField(null=True)  # Optional guild_id for future expansion
+    guild_id = IntegerField(null=True)
     task = TextField()
     order_index = IntegerField()
     created_at = DateTimeField(default=datetime.datetime.now)

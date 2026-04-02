@@ -116,11 +116,11 @@ def test_list_tasks_isolated_by_user():
 
 
 def test_list_tasks_isolated_by_guild_and_private_dm():
-    todo.add_task(USER_ID, "Private Task", guild_id=0)
+    todo.add_task(USER_ID, "Private Task", guild_id=None)
     todo.add_task(USER_ID, "Guild 1 Task", guild_id=GUILD_ID_1)
     todo.add_task(USER_ID, "Guild 2 Task", guild_id=GUILD_ID_2)
 
-    private_tasks = todo.list_tasks(USER_ID, 0)
+    private_tasks = todo.list_tasks(USER_ID, None)
     guild_1_tasks = todo.list_tasks(USER_ID, GUILD_ID_1)
     guild_2_tasks = todo.list_tasks(USER_ID, GUILD_ID_2)
 

@@ -824,8 +824,4 @@ $RECYCLE.BIN/
 
 temp/
 
-shared/db/bot.db
-shared/db/bot_orm.db
-
-shared/db/test.db
-shared/db/test_orm.db
+shared/db/*.db
