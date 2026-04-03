@@ -6,7 +6,7 @@ from collections.abc import Sequence
 import discord
 
 from .errors import InvalidInputError
-from .log import get_ray_id, log_event
+from .log import get_ray_id, log_event, ray_id_var
 from .models import TodoItem, orm_db
 
 
@@ -89,13 +89,13 @@ def update_task(user_id: int, position: int, new_task: str, guild_id: int | None
             "AUDIT_LOG",
             {
                 "event": "AUDIT_LOG",
+                "ray_id": get_ray_id(),
                 "action": "todo_edit",
                 "user_id": user_id,
                 "task_id": task.id,
                 "before": {"task": task.task},
                 "after": {"task": new_task},
                 "position": position,
-                "ray_id": get_ray_id(),
             },
             level="info",
         )
@@ -225,12 +225,17 @@ class EditTaskModal(discord.ui.Modal, title="Edit Task"):
         self.user_id = user_id
         self.guild_id = guild_id
         self.position = position
+        self.ray_id = get_ray_id()
 
         # Prefill the text field with the existing task
         self.task_input = discord.ui.TextInput(label="Edit your task", default=existing_task, style=discord.TextStyle.long)
         self.add_item(self.task_input)
 
     async def on_submit(self, interaction: discord.Interaction):
-        new_task = self.task_input.value
-        update_task(self.user_id, self.position, new_task, self.guild_id)
-        await interaction.response.send_message(f"Task {self.position} updated successfully!")
+        token = ray_id_var.set(self.ray_id)
+        try:
+            new_task = self.task_input.value
+            update_task(self.user_id, self.position, new_task, self.guild_id)
+            await interaction.response.send_message(f"Task {self.position} updated successfully!")
+        finally:
+            ray_id_var.reset(token)

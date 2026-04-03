@@ -5,6 +5,7 @@ import discord
 from pytz import all_timezones
 
 from .errors import InvalidInputError
+from .log import get_ray_id, log_event, ray_id_var
 from .models import WorldClock
 
 all_timezones_lower = list(map(str.lower, all_timezones))
@@ -121,15 +122,35 @@ class EditTimezoneLabelModal(discord.ui.Modal, title="Edit Timezone Label"):
         self.guild_id = guild_id
         self.user_id = user_id
         self.timezone_str = timezone_str
+        self.existing_label = existing_label
+        self.ray_id = get_ray_id()
 
         # Prefill the text field with the existing task
         self.task_input = discord.ui.TextInput(label="Edit label", default=existing_label, style=discord.TextStyle.short)
         self.add_item(self.task_input)
 
     async def on_submit(self, interaction: discord.Interaction):
-        new_label = self.task_input.value
-        update_timezone(self.guild_id, self.user_id, self.timezone_str, new_label)
-        await interaction.response.send_message("Label updated successfully!")
+        token = ray_id_var.set(self.ray_id)
+        try:
+            new_label = self.task_input.value
+            log_event(
+                "AUDIT_LOG",
+                {
+                    "event": "AUDIT_LOG",
+                    "action": "clock_edit",
+                    "user_id": interaction.user.id,
+                    "guild_id": self.guild_id,
+                    "timezone_str": self.timezone_str,
+                    "before": {"label": self.existing_label},
+                    "after": {"label": new_label},
+                    "ray_id": get_ray_id(),
+                },
+                level="info",
+            )
+            update_timezone(self.guild_id, self.user_id, self.timezone_str, new_label)
+            await interaction.response.send_message("Label updated successfully!")
+        finally:
+            ray_id_var.reset(token)
 
 
 def format(wc: WorldClock) -> str:

@@ -4,7 +4,7 @@ from typing import List, Tuple
 import discord
 import pytz
 
-from .log import get_ray_id, log_event
+from .log import get_ray_id, log_event, ray_id_var
 from .models import DailyChecklist, DailyChecklistCheck, orm_db
 
 
@@ -41,11 +41,11 @@ def remove_item(user_id: int, position: int) -> Tuple[bool, str]:
         "AUDIT_LOG",
         {
             "event": "AUDIT_LOG",
+            "ray_id": get_ray_id(),
             "action": "daily_checklist_remove",
             "user_id": user_id,
             "item_id": item.id,
             "before": {"item": item.item, "position": position},
-            "ray_id": get_ray_id(),
         },
         level="info",
     )
@@ -234,35 +234,40 @@ class EditDailyItemModal(discord.ui.Modal, title="Edit Daily Item"):
         super().__init__()
         self.user_id = user_id
         self.index = index
+        self.ray_id = get_ray_id()
 
         self.text_input = discord.ui.TextInput(label="Edit item text", default=existing_text, style=discord.TextStyle.short, max_length=100)
         self.add_item(self.text_input)
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Try to get the old value
+        token = ray_id_var.set(self.ray_id)
         try:
-            items = list_items(self.user_id)
-            old_item = items[self.index - 1] if items and self.index <= len(items) else None
-            old_text = old_item.item if old_item else None
-        except Exception:
-            old_text = None
-        new_text = self.text_input.value
-        log_event(
-            "AUDIT_LOG",
-            {
-                "event": "AUDIT_LOG",
-                "action": "daily_checklist_edit",
-                "user_id": interaction.user.id,
-                "item_id": getattr(old_item, "id", None) if old_item else None,
-                "before": {"item": old_text},
-                "after": {"item": new_text},
-                "position": self.index,
-                "ray_id": get_ray_id(),
-            },
-            level="info",
-        )
-        success, msg = edit_item(self.user_id, self.index, new_text)
-        await interaction.response.send_message(msg, ephemeral=not success)
+            # Try to get the old value
+            try:
+                items = list_items(self.user_id)
+                old_item = items[self.index - 1] if items and self.index <= len(items) else None
+                old_text = old_item.item if old_item else None
+            except Exception:
+                old_text = None
+            new_text = self.text_input.value
+            log_event(
+                "AUDIT_LOG",
+                {
+                    "event": "AUDIT_LOG",
+                    "action": "daily_checklist_edit",
+                    "user_id": interaction.user.id,
+                    "item_id": getattr(old_item, "id", None) if old_item else None,
+                    "before": {"item": old_text},
+                    "after": {"item": new_text},
+                    "position": self.index,
+                    "ray_id": get_ray_id(),
+                },
+                level="info",
+            )
+            success, msg = edit_item(self.user_id, self.index, new_text)
+            await interaction.response.send_message(msg, ephemeral=not success)
+        finally:
+            ray_id_var.reset(token)
 
 
 def format_checklist_response(items: List[Tuple[DailyChecklist, bool]], date: datetime.date) -> str:
