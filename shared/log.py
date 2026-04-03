@@ -174,7 +174,8 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
                 interaction = arg
                 break
 
-        ray_id = get_ray_id()
+        ray_id = str(uuid.uuid4())
+        token = ray_id_var.set(ray_id)
         start_time = time.perf_counter()
         if interaction:
             server_name = interaction.guild.name if interaction.guild else "DM"
@@ -252,6 +253,7 @@ def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Await
                     },
                     level="warning",
                 )
+            ray_id_var.reset(token)
 
     wrapper.__signature__ = inspect.signature(func)
     return wrapper
