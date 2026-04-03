@@ -1,106 +1,115 @@
 # discord-bot-py
 
-## Running discord-bot and/or web backend
+A Discord bot with a small Flask backend and a shared set of utility modules.
 
-In order to run the discord bot or web backend, you need a .env file with the `DISCORD_TOKEN` filled out. You can copy the `.env.example` file to `.env` and add your bot token that has access to a discord server of your choice.
+## Running the app
 
-Once the `DISCORD_TOKEN` has been added, you can run the bot, web backend, or both:
+To run the Discord bot or web backend, create a `.env` file with `DISCORD_TOKEN` set. You can copy `.env.example` to `.env` and add a bot token that has access to one of your Discord servers.
 
-- To run the Discord bot only:
-  ```sh
-  python run.py --bot
-  ```
-- To run the Flask web backend only:
-  ```sh
-  python run.py --web
-  ```
-- To run both the Discord bot and web backend together:
-  ```sh
-  python run.py --bot --web
-  ```
+Once `DISCORD_TOKEN` is configured, you can start either service or both:
 
-## Development Setup
+- Discord bot only:
+```sh
+python run.py --bot
+```
+- Flask web backend only:
+```sh
+python run.py --web
+```
+- Discord bot and web backend together:
+```sh
+python run.py --bot --web
+```
 
-### Python virtual environment (.venv)
+## Development setup
 
-It's recommended to create and use a project-local virtual environment named `.venv` to keep dependencies isolated.
+### Create a virtual environment
 
-Create the environment (cross-platform):
+Using a project-local `.venv` keeps dependencies isolated from the rest of your system.
 
 ```sh
 python -m venv .venv
 ```
 
-Activate the environment:
+Activate it with the shell you use:
 
-- Bash (including WSL or Git Bash on Windows):
-
+- Bash, Git Bash, or WSL on Windows:
 ```sh
-source .venv/Scripts/activate    # on Windows Git Bash or WSL
-# or
-source .venv/bin/activate        # macOS / Linux
+source .venv/Scripts/activate
 ```
-
-- PowerShell (Windows):
-
+- Bash on macOS or Linux:
+```sh
+source .venv/bin/activate
+```
+- PowerShell on Windows:
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
-
-- Command Prompt (cmd.exe) on Windows:
-
+- Command Prompt on Windows:
 ```cmd
 .\.venv\Scripts\activate.bat
 ```
 
-After activating, upgrade pip and install dependencies:
+Install dependencies:
 
 ```sh
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Deactivate the environment when you're done if needed:
+Deactivate the environment when needed:
 
 ```sh
 deactivate
 ```
 
-This project uses [pre-commit](https://pre-commit.com/) hooks for formatting and linting.
-To set up:
+### Pre-commit hooks
+
+This project uses [pre-commit](https://pre-commit.com/) for import sorting, formatting, and linting.
+
+Install the hooks:
 
 ```sh
 pre-commit install
 ```
 
-This will automatically run checks before you commit.
-You can run all hooks manually with:
+Run all hooks manually:
 
 ```sh
 pre-commit run --all-files
 ```
 
+The configured hook order is:
+
+1. `isort`
+2. `black`
+3. `flake8`
+
+## Database migrations
+
+Database migration commands and examples are documented in [DB.md](./DB.md).
+
 ## Testing
 
-To run the test suite:
+Run the test suite from the project root:
 
 ```sh
 ENV=TEST pytest
 ```
 
-## Linting & Code Style
+## Linting and Code Style
 
-To check code style and linting manually, run:
+To run the checks manually in the same order as pre-commit:
 
 ```sh
-flake8 .
-black --check .
 isort --check-only .
+black --check .
+flake8 .
 ```
 
-- `flake8` checks for general linting issues. ([flake8](https://github.com/pycqa/flake8))
-- `black --check` checks code formatting (auto-format with `black .`). ([black](https://github.com/psf/black))
-- `isort --check-only` checks import order (auto-fix with `isort .`). ([isort](https://github.com/PyCQA/isort))
+- `isort --check-only` verifies import ordering. Auto-fix with `isort .`. ([isort](https://github.com/PyCQA/isort))
+- `black --check` verifies formatting. Auto-fix with `black .`. ([black](https://github.com/psf/black))
+- `flake8` checks for linting issues.([flake8](https://github.com/pycqa/flake8))
 
 
 ### Links used:
