@@ -1,6 +1,9 @@
 import random
 from datetime import datetime, timedelta
 from typing import Dict, Tuple
+from zoneinfo import ZoneInfo
+
+from .config import config
 
 FORTUNES = [
     "You will have a pleasant surprise today!",
@@ -108,7 +111,7 @@ SNARKY_LINES = [
 
 def get_fortune(user_id: int, date: str = None) -> str:
     if date is None:
-        date = datetime.now().strftime("%Y-%m-%d")
+        date = _get_today_date()
 
     key = (user_id, date)
     count = _fortune_counter.get(key, 0) + 1
@@ -122,6 +125,10 @@ def get_fortune(user_id: int, date: str = None) -> str:
         snark = random.choice(SNARKY_LINES).replace("{num}", str(count))
         return f"{snark}\n{fortune}"
     return fortune
+
+
+def _get_today_date() -> str:
+    return datetime.now(ZoneInfo(config.home_timezone)).strftime("%Y-%m-%d")
 
 
 def _get_deterministic_fortune(user_id: int, date: str) -> str:

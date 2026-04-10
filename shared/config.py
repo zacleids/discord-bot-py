@@ -3,6 +3,9 @@ from enum import Enum
 
 from dotenv import load_dotenv
 
+from .errors import InvalidInputError
+from .timezone import get_valid_timezone
+
 
 class Environment(Enum):
     PROD = "PROD"
@@ -49,6 +52,7 @@ class Config:
         # Configurations for various features
 
         self.performance_warning_threshold = self._load_performance_warning_threshold()
+        self.home_timezone = self._load_home_timezone()
 
     def _buffer_log_event(self, event_type, context, level):
         self._log_buffer.append((event_type, context, level))
@@ -83,6 +87,25 @@ class Config:
                 "WARNING",
             )
             return 1.0
+
+    def _load_home_timezone(self):
+        """Load the home timezone from environment variable or default to US/Pacific."""
+        raw_value = os.environ.get("HOME_TIMEZONE", "US/Pacific")
+        try:
+            val = get_valid_timezone(raw_value)
+            self._buffer_log_event("CONFIG_LOADED", {"event": "CONFIG_LOADED", "message": "Loaded HOME_TIMEZONE", "value": val}, "DEBUG")
+            return val
+        except InvalidInputError:
+            self._buffer_log_event(
+                "CONFIG_ERROR",
+                {
+                    "event": "CONFIG_ERROR",
+                    "message": "Invalid HOME_TIMEZONE, defaulting to US/Pacific",
+                    "value": raw_value,
+                },
+                "WARNING",
+            )
+            return "US/Pacific"
 
 
 # At the end of the file, create and export a single config instance

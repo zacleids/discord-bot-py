@@ -6,6 +6,8 @@ A Discord bot with a small Flask backend and a shared set of utility modules.
 
 To run the Discord bot or web backend, create a `.env` file with `DISCORD_TOKEN` set. You can copy `.env.example` to `.env` and add a bot token that has access to one of your Discord servers.
 
+The bot also supports `HOME_TIMEZONE` for features that depend on "today", including the daily fortune. If unset, it defaults to `US/Pacific`.
+
 Once `DISCORD_TOKEN` is configured, you can start either service or both:
 
 - Discord bot only:
