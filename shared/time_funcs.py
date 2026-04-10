@@ -2,13 +2,11 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import discord
-from pytz import all_timezones
 
 from .errors import InvalidInputError
 from .log import get_ray_id, log_event, ray_id_var
 from .models import WorldClock
-
-all_timezones_lower = list(map(str.lower, all_timezones))
+from .timezone import get_valid_timezone
 
 DB_NAME = "db/bot.db"
 
@@ -101,19 +99,6 @@ def handle_world_clock_command(args: list[str], guild_id: int | None, user_id: i
             case _:
                 result = f"Invalid subcommand {subcommand}. Please provide a subcommand (add, remove, list)."
     return result
-
-
-def return_all_timezones():
-    return all_timezones + list(map(str.lower, all_timezones))
-
-
-def get_valid_timezone(zone: str) -> str:
-    if zone in all_timezones:
-        return zone
-    elif zone in all_timezones_lower:
-        return all_timezones[all_timezones_lower.index(zone)]
-    else:
-        raise InvalidInputError("Timezone not found")
 
 
 class EditTimezoneLabelModal(discord.ui.Modal, title="Edit Timezone Label"):
