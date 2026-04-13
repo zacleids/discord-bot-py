@@ -66,6 +66,20 @@ class WorldClock(BaseModel):
     created_at = DateTimeField(default=datetime.datetime.now)
 
 
+class LiveMessage(BaseModel):
+    id = IntegerField(primary_key=True)
+    message_type = CharField()
+    message_id = IntegerField(unique=True)
+    channel_id = IntegerField()
+    guild_id = IntegerField(null=True)
+    user_id = IntegerField()
+    expires_at = DateTimeField()
+    last_refreshed_at = DateTimeField(null=True)
+    stopped_at = DateTimeField(null=True)
+    stop_reason = CharField(null=True)
+    created_at = DateTimeField(default=datetime.datetime.now)
+
+
 class TodoItem(BaseModel):
     user_id = IntegerField()
     guild_id = IntegerField(null=True)

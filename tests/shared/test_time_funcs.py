@@ -1,14 +1,20 @@
+from datetime import datetime, timezone
+
 import pytest
 
 from shared.time_funcs import (
     InvalidInputError,
     WorldClock,
     add_timezone,
+    build_world_clock_embed,
     format_time,
     format_tzs_response_str,
+    get_live_message_expiry,
     get_valid_timezone,
+    get_world_clock_local_time,
     list_timezones,
     remove_timezone,
+    sort_world_clocks_by_display_time,
     update_timezone,
 )
 
@@ -190,3 +196,61 @@ def test_worldclock_scope_requires_exactly_one_owner_dimension():
 
     with pytest.raises(InvalidInputError):
         list_timezones(GUILD_ID, USER_ID)
+
+
+def test_sort_world_clocks_by_display_time_orders_by_local_wall_time():
+    reference_now = datetime(2024, 2, 15, 12, 0, tzinfo=timezone.utc)
+    tzs = [
+        WorldClock(guild_id=GUILD_ID, user_id=None, timezone_str="Asia/Tokyo", label="Tokyo"),
+        WorldClock(guild_id=GUILD_ID, user_id=None, timezone_str="Europe/London", label="London"),
+        WorldClock(guild_id=GUILD_ID, user_id=None, timezone_str="America/Los_Angeles", label="Los Angeles"),
+    ]
+
+    sorted_tzs = sort_world_clocks_by_display_time(tzs, now=reference_now)
+
+    assert [tz.timezone_str for tz in sorted_tzs] == [
+        "America/Los_Angeles",
+        "Europe/London",
+        "Asia/Tokyo",
+    ]
+
+
+def test_format_tzs_response_str_uses_sorted_display_order():
+    reference_now = datetime(2024, 2, 15, 12, 0, tzinfo=timezone.utc)
+    tzs = [
+        WorldClock(guild_id=GUILD_ID, user_id=None, timezone_str="Asia/Tokyo", label="Tokyo"),
+        WorldClock(guild_id=GUILD_ID, user_id=None, timezone_str="Europe/London", label="London"),
+        WorldClock(guild_id=GUILD_ID, user_id=None, timezone_str="America/Los_Angeles", label="Los Angeles"),
+    ]
+
+    response = format_tzs_response_str(tzs, now=reference_now)
+
+    assert response.index("Los Angeles") < response.index("London")
+    assert response.index("London") < response.index("Tokyo")
+
+
+def test_build_world_clock_embed_for_dm_scope_uses_sorted_lines_and_expiry():
+    reference_now = datetime(2024, 2, 15, 12, 0, tzinfo=timezone.utc)
+    add_timezone(None, USER_ID, "Asia/Tokyo", label="Tokyo")
+    add_timezone(None, USER_ID, "America/Los_Angeles", label="Los Angeles")
+
+    embed = build_world_clock_embed(None, USER_ID, now=reference_now, expires_at=get_live_message_expiry(reference_now))
+
+    assert embed.title == "World Clock"
+    assert embed.description.index("Los Angeles") < embed.description.index("Tokyo")
+    assert "**Los Angeles** | America/Los_Angeles | Thursday February 15 04:00 AM" in embed.description
+    assert "**Tokyo** | Asia/Tokyo | Thursday February 15 09:00 PM" in embed.description
+    assert embed.footer.text == "DM scope | Updates every minute"
+    assert embed.fields[0].name == "Live Status"
+    assert "Expires: <t:" in embed.fields[0].value
+    assert "Updated: <t:" in embed.fields[0].value
+
+
+def test_get_world_clock_local_time_uses_reference_time():
+    reference_now = datetime(2024, 2, 15, 12, 0, tzinfo=timezone.utc)
+    world_clock = WorldClock(guild_id=GUILD_ID, user_id=None, timezone_str="Europe/London", label="London")
+
+    local_time = get_world_clock_local_time(world_clock, now=reference_now)
+
+    assert local_time.tzinfo is not None
+    assert format_time(local_time) == "Thursday February 15 12:00 PM"
