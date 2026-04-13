@@ -28,6 +28,7 @@ from shared import (
 from shared.config import config
 from shared.db import db
 from shared.errors import InvalidInputError
+from shared.live_messages import refresh_live_message, stop_live_message
 from shared.log import (
     get_ray_id,
     log_and_send_message_command,
@@ -36,6 +37,7 @@ from shared.log import (
     log_interaction,
     ray_id_var,
 )
+from shared.models import LiveMessage
 from shared.reminder import EditReminderModal, Reminder
 from shared.utils import format_number, guild_only
 
@@ -114,10 +116,18 @@ async def on_ready():
     )
     try:
         log_event("CHECK_REMINDERS_START", level="debug")
-        check_reminders.start()
+        if not check_reminders.is_running():
+            check_reminders.start()
         log_event("CHECK_REMINDERS_LOOP_STARTED", level="debug")
     except Exception as e:
         log_event("CHECK_REMINDERS_START_ERROR", {"error": str(e)}, level="error")
+    try:
+        log_event("LIVE_MESSAGES_START", level="debug")
+        if not refresh_live_messages.is_running():
+            refresh_live_messages.start()
+        log_event("LIVE_MESSAGES_LOOP_STARTED", level="debug")
+    except Exception as e:
+        log_event("LIVE_MESSAGES_START_ERROR", {"error": str(e)}, level="error")
 
 
 @client.event
@@ -620,12 +630,38 @@ async def todo_edit_slash_command(interaction: discord.Interaction, position: in
 async def clock_list_slash_command(interaction: discord.Interaction):
     guild_id = interaction.guild_id
     user_id = None if interaction.guild_id is not None else interaction.user.id
-    tzs = time_funcs.list_timezones(guild_id, user_id)
-    if tzs:
-        response = time_funcs.format_tzs_response_str(tzs)
-        await log_and_send_message_interaction(interaction, response)
-    else:
-        await log_and_send_message_interaction(interaction, "There are no clocks in your world clock")
+    expires_at = time_funcs.get_live_message_expiry()
+    embed = time_funcs.build_world_clock_embed(guild_id, user_id, expires_at=expires_at)
+    response_message = await log_and_send_message_interaction(
+        interaction,
+        embed=embed,
+        fetch_response_message=True,
+    )
+
+    if time_funcs.list_timezones(guild_id, user_id):
+        live_message = LiveMessage.create(
+            message_type=time_funcs.LIVE_MESSAGE_TYPE_WORLD_CLOCK,
+            message_id=response_message.id,
+            channel_id=response_message.channel.id,
+            guild_id=guild_id,
+            user_id=interaction.user.id,
+            expires_at=expires_at,
+        )
+        log_event(
+            "LIVE_MESSAGE_CREATED",
+            {
+                "ray_id": get_ray_id(),
+                "event": "LIVE_MESSAGE_CREATED",
+                "live_message_id": live_message.id,
+                "message_type": live_message.message_type,
+                "message_id": live_message.message_id,
+                "channel_id": live_message.channel_id,
+                "guild_id": live_message.guild_id,
+                "user_id": live_message.user_id,
+                "expires_at": str(live_message.expires_at),
+            },
+            level="info",
+        )
 
 
 async def clock_full_list_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
@@ -1148,6 +1184,77 @@ async def before_check_reminders():
 
         tb_str = traceback.format_exc()
         log_event("CHECK_REMINDERS_BEFORE_LOOP_ERROR", {"error": str(e), "traceback": tb_str}, level="error")
+
+
+@tasks.loop(minutes=1)
+async def refresh_live_messages():
+    log_event("LIVE_MESSAGES_LOOP_TICK", level="debug")
+    now = datetime.now(timezone.utc)
+    now_naive = now.replace(tzinfo=None)
+    active_messages = LiveMessage.select().where(LiveMessage.stopped_at.is_null())
+    for live_message in active_messages:
+        try:
+            if live_message.expires_at <= now_naive:
+                stop_live_message(live_message, "expired")
+                continue
+            await refresh_live_message(client, live_message, now)
+        except discord.NotFound:
+            stop_live_message(live_message, "message_or_channel_not_found", level="warning")
+        except discord.Forbidden:
+            stop_live_message(live_message, "forbidden", level="warning")
+        except discord.HTTPException as e:
+            log_event(
+                "LIVE_MESSAGE_REFRESH_ERROR",
+                {
+                    "ray_id": get_ray_id(),
+                    "event": "LIVE_MESSAGE_REFRESH_ERROR",
+                    "live_message_id": live_message.id,
+                    "message_type": live_message.message_type,
+                    "message_id": live_message.message_id,
+                    "channel_id": live_message.channel_id,
+                    "guild_id": live_message.guild_id,
+                    "user_id": live_message.user_id,
+                    "error_type": "HTTPException",
+                    "error": str(e),
+                },
+                level="error",
+            )
+        except Exception as e:
+            import traceback
+
+            tb_str = traceback.format_exc()
+            log_event(
+                "LIVE_MESSAGE_REFRESH_ERROR",
+                {
+                    "ray_id": get_ray_id(),
+                    "event": "LIVE_MESSAGE_REFRESH_ERROR",
+                    "live_message_id": live_message.id,
+                    "message_type": live_message.message_type,
+                    "message_id": live_message.message_id,
+                    "channel_id": live_message.channel_id,
+                    "guild_id": live_message.guild_id,
+                    "user_id": live_message.user_id,
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "traceback": tb_str,
+                },
+                level="error",
+            )
+
+
+@refresh_live_messages.before_loop
+async def before_refresh_live_messages():
+    log_event("LIVE_MESSAGES_BEFORE_LOOP_START", level="info")
+    try:
+        await asyncio.wait_for(client.wait_until_ready(), timeout=10)
+        log_event("LIVE_MESSAGES_BEFORE_LOOP_DONE", level="info")
+    except asyncio.TimeoutError:
+        log_event("LIVE_MESSAGES_BEFORE_LOOP_TIMEOUT", level="error")
+    except Exception as e:
+        import traceback
+
+        tb_str = traceback.format_exc()
+        log_event("LIVE_MESSAGES_BEFORE_LOOP_ERROR", {"error": str(e), "traceback": tb_str}, level="error")
 
 
 @tasks.loop(minutes=5)

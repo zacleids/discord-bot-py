@@ -129,7 +129,9 @@ def log_and_send_message_command(message, content=None, *, files=None, exec_time
         return message.channel.send(content, **kwargs)
 
 
-def log_and_send_message_interaction(interaction: discord.Interaction, content=None, *, files=None, exec_time=None, **kwargs):
+def log_and_send_message_interaction(
+    interaction: discord.Interaction, content=None, *, files=None, exec_time=None, fetch_response_message=False, **kwargs
+):
     """
     Helper to log outgoing interaction (slash command) responses and send the message.
     Logs content, files, ray id, and execution time, then sends the message.
@@ -155,11 +157,19 @@ def log_and_send_message_interaction(interaction: discord.Interaction, content=N
         "exec_time": exec_time,
     }
     log_event("OUTGOING_INTERACTION", log_context)
-    # Use response.send_message if not responded, else followup.send
-    if not interaction.response.is_done():
-        return interaction.response.send_message(content, files=files, **kwargs)
-    else:
-        return interaction.followup.send(content, files=files, **kwargs)
+
+    async def _send_response():
+        if not interaction.response.is_done():
+            await interaction.response.send_message(content, files=files, **kwargs)
+            if fetch_response_message:
+                return await interaction.original_response()
+            return None
+
+        if fetch_response_message:
+            kwargs.setdefault("wait", True)
+        return await interaction.followup.send(content, files=files, **kwargs)
+
+    return _send_response()
 
 
 def log_interaction(func: Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
