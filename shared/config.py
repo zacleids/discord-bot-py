@@ -1,4 +1,5 @@
 import os
+import sys
 from enum import Enum
 
 from dotenv import load_dotenv
@@ -18,8 +19,16 @@ class Config:
         self._log_buffer = []  # Buffer for early config log events
         self.environment = Environment(os.getenv("ENV", "DEV"))
 
-        # If running under pytest, override with .env.test
-        if "PYTEST_CURRENT_TEST" in os.environ or os.getenv("ENV") == "TEST":
+        # VS Code pytest discovery imports project modules before PYTEST_CURRENT_TEST exists,
+        # so use argv/module detection as well.
+        running_under_pytest = (
+            os.getenv("ENV") == "TEST"
+            or "PYTEST_CURRENT_TEST" in os.environ
+            or "pytest" in sys.modules
+            or any("pytest" in arg.lower() for arg in sys.argv)
+        )
+
+        if running_under_pytest:
             load_dotenv(".env.test", override=True)
             os.environ["ENV"] = "TEST"
         else:

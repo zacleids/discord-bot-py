@@ -234,3 +234,12 @@ def test_case_in_phrase_is_preserved():
     # The board should reveal the original case of the phrase
     assert "PyThOn" in board
     assert "You Win" in board
+
+
+def test_correct_guess_not_listed_as_incorrect_for_uppercase_phrase():
+    game = HangmanGame.create(guild_id=GUILD_ID, user_id=USER_ID, phrase="The Enchanted", num_guesses=6)
+    game.guess_new_letters("t")
+    board = game.print_board()
+    assert "T" in board
+    assert "Incorrect guesses: t" not in board
+    assert "6/6 guesses remaining" in board

@@ -84,9 +84,10 @@ def calculate_board(game: HangmanGame):
         "~",
     }
     guessed_set = set(game.guessed_characters)
+    normalized_phrase = game.phrase.lower()
     pass_through_chars.update(guessed_set)
     game.board = "".join(char if char.lower() in pass_through_chars else r"\_" for char in game.phrase)
-    incorrect_guesses = sorted(guess for guess in guessed_set if guess not in game.phrase)
+    incorrect_guesses = sorted(guess for guess in guessed_set if guess not in normalized_phrase)
     if "_" not in game.board:
         game.game_over = True
     elif game.num_guesses is not None and len(incorrect_guesses) >= game.num_guesses:
@@ -96,7 +97,8 @@ def calculate_board(game: HangmanGame):
 
 def print_board(game: HangmanGame) -> str:
     extra_str = ""
-    incorrect_guesses = [guess for guess in game.guessed_characters if guess not in game.phrase]
+    normalized_phrase = game.phrase.lower()
+    incorrect_guesses = [guess for guess in game.guessed_characters if guess not in normalized_phrase]
     if incorrect_guesses:
         extra_str += f"\nIncorrect guesses: {', '.join(incorrect_guesses)}"
     if game.num_guesses is not None:
