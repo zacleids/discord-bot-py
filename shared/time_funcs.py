@@ -10,7 +10,17 @@ from .timezone import get_valid_timezone
 
 LIVE_MESSAGE_TYPE_WORLD_CLOCK = "world_clock_list_v1"
 LIVE_MESSAGE_EXPIRY = timedelta(hours=24)
-DB_NAME = "db/bot.db"
+WORLD_CLOCK_LIVE_MESSAGE_INDEFINITE = "Indefinite"
+WORLD_CLOCK_SUPERSEDED_STATUS = "Newer message created, no longer live."
+WORLD_CLOCK_LIVE_MESSAGE_DURATIONS: tuple[tuple[str, timedelta | None], ...] = (
+    ("1 hour", timedelta(hours=1)),
+    ("4 hours", timedelta(hours=4)),
+    ("1 day", timedelta(days=1)),
+    ("2 days", timedelta(days=2)),
+    ("3 days", timedelta(days=3)),
+    ("1 week", timedelta(weeks=1)),
+    (WORLD_CLOCK_LIVE_MESSAGE_INDEFINITE, None),
+)
 
 
 def _validate_scope(guild_id: int | None, user_id: int | None):
@@ -67,6 +77,31 @@ def get_live_message_expiry(now: datetime | None = None) -> datetime:
     return (_get_reference_now(now) + LIVE_MESSAGE_EXPIRY).replace(tzinfo=None)
 
 
+def get_world_clock_duration_labels(*, include_indefinite: bool = False, current: str = "") -> list[str]:
+    current_lower = current.lower()
+    labels = []
+    for label, duration in WORLD_CLOCK_LIVE_MESSAGE_DURATIONS:
+        if duration is None and not include_indefinite:
+            continue
+        if current_lower in label.lower():
+            labels.append(label)
+    return labels
+
+
+def get_live_message_expiry_for_duration(duration_label: str | None, now: datetime | None = None) -> datetime | None:
+    if duration_label is None:
+        return get_live_message_expiry(now)
+
+    for label, duration in WORLD_CLOCK_LIVE_MESSAGE_DURATIONS:
+        if label != duration_label:
+            continue
+        if duration is None:
+            return None
+        return (_get_reference_now(now) + duration).replace(tzinfo=None)
+
+    raise InvalidInputError(f"Invalid live message duration: {duration_label}")
+
+
 def get_world_clock_local_time(world_clock: WorldClock, now: datetime | None = None) -> datetime:
     return _get_reference_now(now).astimezone(ZoneInfo(world_clock.timezone_str))
 
@@ -116,6 +151,7 @@ def build_world_clock_embed(
     *,
     now: datetime | None = None,
     expires_at: datetime | None = None,
+    live_status_text: str | None = None,
 ) -> discord.Embed:
     reference_now = _get_reference_now(now)
     tzs = list_timezones(guild_id, user_id)
@@ -127,16 +163,20 @@ def build_world_clock_embed(
         embed.description = "There are no clocks in your world clock"
 
     scope_label = "DM" if guild_id is None else "Guild"
-    status_lines = [
-        f"Updated: {discord.utils.format_dt(reference_now, style='R')}",
-    ]
-    if expires_at is not None:
-        expiry_time = _get_reference_now(expires_at)
-        relative_expiry = discord.utils.format_dt(expiry_time, style="R")
-        # absolute_expiry = discord.utils.format_dt(expiry_time, style='F')
-        # status_lines.append(f"Expires: {relative_expiry} ({absolute_expiry})")
-        status_lines.append(f"Expires: {relative_expiry}")
-    embed.add_field(name="Live Status", value=" | ".join(status_lines), inline=False)
+    if live_status_text is None:
+        status_lines = [
+            f"Updated: {discord.utils.format_dt(reference_now, style='R')}",
+        ]
+        if expires_at is not None:
+            expiry_time = _get_reference_now(expires_at)
+            relative_expiry = discord.utils.format_dt(expiry_time, style="R")
+            # absolute_expiry = discord.utils.format_dt(expiry_time, style='F')
+            # status_lines.append(f"Expires: {relative_expiry} ({absolute_expiry})")
+            status_lines.append(f"Expires: {relative_expiry}")
+        else:
+            status_lines.append("Expires: Never")
+        live_status_text = " | ".join(status_lines)
+    embed.add_field(name="Live Status", value=live_status_text, inline=False)
     embed.set_footer(text=f"{scope_label} scope | Updates every minute")
     return embed
 
