@@ -28,7 +28,12 @@ from shared import (
 from shared.config import config
 from shared.db import db
 from shared.errors import InvalidInputError
-from shared.live_messages import refresh_live_message, stop_live_message
+from shared.live_messages import (
+    refresh_live_message,
+    should_refresh_live_message_this_tick,
+    stop_live_message,
+    supersede_conflicting_live_messages,
+)
 from shared.log import (
     get_ray_id,
     log_and_send_message_command,
@@ -624,44 +629,75 @@ async def todo_edit_slash_command(interaction: discord.Interaction, position: in
     await interaction.response.send_modal(todo.EditTaskModal(user_id, todo_guild_id, position, existing_task))
 
 
+def can_use_indefinite_world_clock_duration(interaction: discord.Interaction) -> bool:
+    if interaction.user.id == config.bot_admin_id:
+        return True
+    if interaction.guild is None:
+        return False
+    return interaction.user.id == interaction.guild.owner_id
+
+
+async def clock_duration_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
+    options = time_funcs.get_world_clock_duration_labels(
+        include_indefinite=can_use_indefinite_world_clock_duration(interaction),
+        current=current,
+    )
+    return [discord.app_commands.Choice(name=option, value=option) for option in options][:25]
+
+
 # Subcommand `/clock list`
 @clock_command_group.command(name="list", description="List all clocks in your world clock")
+@discord.app_commands.autocomplete(duration=clock_duration_autocomplete)
 @log_interaction
-async def clock_list_slash_command(interaction: discord.Interaction):
+async def clock_list_slash_command(interaction: discord.Interaction, duration: str = None):
     guild_id = interaction.guild_id
     user_id = None if interaction.guild_id is not None else interaction.user.id
-    expires_at = time_funcs.get_live_message_expiry()
-    embed = time_funcs.build_world_clock_embed(guild_id, user_id, expires_at=expires_at)
+    now = datetime.now(timezone.utc)
+
+    if duration == time_funcs.WORLD_CLOCK_LIVE_MESSAGE_INDEFINITE and not can_use_indefinite_world_clock_duration(interaction):
+        await log_and_send_message_interaction(
+            interaction,
+            "Only the guild owner or bot admin can create an indefinite live world clock.",
+        )
+        return
+
+    try:
+        expires_at = time_funcs.get_live_message_expiry_for_duration(duration)
+    except InvalidInputError as exc:
+        await log_and_send_message_interaction(interaction, str(exc))
+        return
+
+    embed = time_funcs.build_world_clock_embed(guild_id, user_id, now=now, expires_at=expires_at)
     response_message = await log_and_send_message_interaction(
         interaction,
         embed=embed,
         fetch_response_message=True,
     )
 
-    if time_funcs.list_timezones(guild_id, user_id):
-        live_message = LiveMessage.create(
-            message_type=time_funcs.LIVE_MESSAGE_TYPE_WORLD_CLOCK,
-            message_id=response_message.id,
-            channel_id=response_message.channel.id,
-            guild_id=guild_id,
-            user_id=interaction.user.id,
-            expires_at=expires_at,
-        )
-        log_event(
-            "LIVE_MESSAGE_CREATED",
-            {
-                "ray_id": get_ray_id(),
-                "event": "LIVE_MESSAGE_CREATED",
-                "live_message_id": live_message.id,
-                "message_type": live_message.message_type,
-                "message_id": live_message.message_id,
-                "channel_id": live_message.channel_id,
-                "guild_id": live_message.guild_id,
-                "user_id": live_message.user_id,
-                "expires_at": str(live_message.expires_at),
-            },
-            level="info",
-        )
+    live_message = LiveMessage.create(
+        message_type=time_funcs.LIVE_MESSAGE_TYPE_WORLD_CLOCK,
+        message_id=response_message.id,
+        channel_id=response_message.channel.id,
+        guild_id=guild_id,
+        user_id=interaction.user.id,
+        expires_at=expires_at,
+    )
+    await supersede_conflicting_live_messages(client, live_message, now)
+    log_event(
+        "LIVE_MESSAGE_CREATED",
+        {
+            "ray_id": get_ray_id(),
+            "event": "LIVE_MESSAGE_CREATED",
+            "live_message_id": live_message.id,
+            "message_type": live_message.message_type,
+            "message_id": live_message.message_id,
+            "channel_id": live_message.channel_id,
+            "guild_id": live_message.guild_id,
+            "user_id": live_message.user_id,
+            "expires_at": str(live_message.expires_at),
+        },
+        level="info",
+    )
 
 
 async def clock_full_list_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
@@ -1186,16 +1222,18 @@ async def before_check_reminders():
         log_event("CHECK_REMINDERS_BEFORE_LOOP_ERROR", {"error": str(e), "traceback": tb_str}, level="error")
 
 
-@tasks.loop(minutes=1)
+@tasks.loop(seconds=10)
 async def refresh_live_messages():
     log_event("LIVE_MESSAGES_LOOP_TICK", level="debug")
     now = datetime.now(timezone.utc)
     now_naive = now.replace(tzinfo=None)
-    active_messages = LiveMessage.select().where(LiveMessage.stopped_at.is_null())
+    active_messages = LiveMessage.select().where(LiveMessage.stopped_at.is_null()).order_by(LiveMessage.id.asc())
     for live_message in active_messages:
         try:
-            if live_message.expires_at <= now_naive:
+            if live_message.expires_at is not None and live_message.expires_at <= now_naive:
                 stop_live_message(live_message, "expired")
+                continue
+            if not should_refresh_live_message_this_tick(live_message, now):
                 continue
             await refresh_live_message(client, live_message, now)
         except discord.NotFound:

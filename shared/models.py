@@ -73,7 +73,7 @@ class LiveMessage(BaseModel):
     channel_id = IntegerField()
     guild_id = IntegerField(null=True)
     user_id = IntegerField()
-    expires_at = DateTimeField()
+    expires_at = DateTimeField(null=True)
     last_refreshed_at = DateTimeField(null=True)
     stopped_at = DateTimeField(null=True)
     stop_reason = CharField(null=True)

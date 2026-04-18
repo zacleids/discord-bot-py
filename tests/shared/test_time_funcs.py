@@ -10,7 +10,9 @@ from shared.time_funcs import (
     format_time,
     format_tzs_response_str,
     get_live_message_expiry,
+    get_live_message_expiry_for_duration,
     get_valid_timezone,
+    get_world_clock_duration_labels,
     get_world_clock_local_time,
     list_timezones,
     remove_timezone,
@@ -244,6 +246,57 @@ def test_build_world_clock_embed_for_dm_scope_uses_sorted_lines_and_expiry():
     assert embed.fields[0].name == "Live Status"
     assert "Expires: <t:" in embed.fields[0].value
     assert "Updated: <t:" in embed.fields[0].value
+
+
+def test_build_world_clock_embed_for_indefinite_duration_shows_never():
+    reference_now = datetime(2024, 2, 15, 12, 0, tzinfo=timezone.utc)
+    add_timezone(None, USER_ID, "Asia/Tokyo", label="Tokyo")
+
+    embed = build_world_clock_embed(None, USER_ID, now=reference_now, expires_at=None)
+
+    assert embed.fields[0].name == "Live Status"
+    assert "Updated: <t:" in embed.fields[0].value
+    assert "Expires: Never" in embed.fields[0].value
+
+
+def test_build_world_clock_embed_supports_stale_status_override():
+    reference_now = datetime(2024, 2, 15, 12, 0, tzinfo=timezone.utc)
+
+    embed = build_world_clock_embed(
+        None,
+        USER_ID,
+        now=reference_now,
+        expires_at=None,
+        live_status_text="Newer message created, no longer live.",
+    )
+
+    assert embed.fields[0].name == "Live Status"
+    assert embed.fields[0].value == "Newer message created, no longer live."
+
+
+def test_get_world_clock_duration_labels_excludes_indefinite_by_default():
+    labels = get_world_clock_duration_labels()
+
+    assert labels == ["1 hour", "4 hours", "1 day", "2 days", "3 days", "1 week"]
+
+
+def test_get_world_clock_duration_labels_includes_indefinite_when_allowed():
+    labels = get_world_clock_duration_labels(include_indefinite=True)
+
+    assert labels == ["1 hour", "4 hours", "1 day", "2 days", "3 days", "1 week", "Indefinite"]
+
+
+def test_get_live_message_expiry_for_duration_supports_indefinite_and_known_durations():
+    reference_now = datetime(2024, 2, 15, 12, 0, tzinfo=timezone.utc)
+
+    assert get_live_message_expiry_for_duration(None, reference_now) == get_live_message_expiry(reference_now)
+    assert get_live_message_expiry_for_duration("4 hours", reference_now) == datetime(2024, 2, 15, 16, 0)
+    assert get_live_message_expiry_for_duration("Indefinite", reference_now) is None
+
+
+def test_get_live_message_expiry_for_duration_rejects_invalid_value():
+    with pytest.raises(InvalidInputError):
+        get_live_message_expiry_for_duration("forever")
 
 
 def test_get_world_clock_local_time_uses_reference_time():
